@@ -388,11 +388,21 @@ ogr2ogr output.gpkg /vsiaz/container/path/data.parquet
 
 ## Step 5: Visualize
 
-### Interactive Maps with PMTiles
+### IMPORTANT: Always Use PMTiles for Maps
 
-PMTiles are the preferred visualization format in Portolan catalogs. They enable serverless map rendering via HTTP range requests.
+**DO NOT export GeoJSON or bundle data inline for interactive maps.** Portolan collections already include PMTiles files optimized for web display. Use them directly — they stream efficiently via HTTP range requests, handle millions of features, and require zero data processing.
 
-**MapLibre GL JS (HTML):**
+**Always use MapLibre GL JS + PMTiles protocol** for interactive maps. This is the standard stack for Portolan visualization.
+
+When building a map:
+1. Find the `.pmtiles` URL from the collection's assets in `collection.json`
+2. Use MapLibre GL JS with the `pmtiles` protocol
+3. Add multiple PMTiles sources when visualizing data from multiple collections
+4. Style with MapLibre expressions for data-driven rendering (color by category, filter by attribute, etc.)
+
+### MapLibre + PMTiles (Default)
+
+This is the template for every interactive map. Adapt the URLs, source-layer names, and paint styles to your data:
 
 ```html
 <!DOCTYPE html>
@@ -423,7 +433,7 @@ const map = new maplibregl.Map({
             id: "data-layer",
             type: "fill",
             source: "data",
-            "source-layer": "data",  // Check PMTiles metadata for layer name
+            "source-layer": "data",
             paint: {
                 "fill-color": "#3388ff",
                 "fill-opacity": 0.6,
@@ -439,70 +449,159 @@ map.addControl(new maplibregl.NavigationControl());
 </html>
 ```
 
-**Adapt the URL** to wherever the PMTiles file is hosted.
+### Multiple Layers from Different Collections
 
-### deck.gl (for large datasets / 3D)
+When visualizing data from multiple collections (e.g., parks + buildings), add each as a separate PMTiles source:
 
-deck.gl is better for very large datasets, 3D visualization, and analytical overlays:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
-    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
-    <style>body { margin: 0; } #map { width: 100%; height: 100vh; }</style>
-</head>
-<body>
-<div id="map"></div>
-<script>
-const deckgl = new deck.DeckGL({
+```javascript
+const map = new maplibregl.Map({
     container: "map",
-    mapStyle: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
-    initialViewState: {
-        longitude: 5.5,
-        latitude: 52.0,
-        zoom: 7,
-        pitch: 45
-    },
+    style: {
+        version: 8,
+        sources: {
+            parks: {
+                type: "vector",
+                url: "pmtiles://https://example.com/catalog/parks/parks.pmtiles"
+            },
+            buildings: {
+                type: "vector",
+                url: "pmtiles://https://example.com/catalog/buildings/buildings.pmtiles"
+            }
+        },
+        layers: [
+            {
+                id: "parks-fill",
+                type: "fill",
+                source: "parks",
+                "source-layer": "parks",
+                paint: {
+                    "fill-color": "#2d6a4f",
+                    "fill-opacity": 0.3
+                }
+            },
+            {
+                id: "parks-outline",
+                type: "line",
+                source: "parks",
+                "source-layer": "parks",
+                paint: {
+                    "line-color": "#1b4332",
+                    "line-width": 2
+                }
+            },
+            {
+                id: "buildings-fill",
+                type: "fill",
+                source: "buildings",
+                "source-layer": "buildings",
+                paint: {
+                    // Data-driven styling — color by attribute
+                    "fill-color": ["match", ["get", "gebruiksdoel"],
+                        "woonfunctie", "#4361ee",
+                        "industriefunctie", "#e63946",
+                        "kantoorfunctie", "#f4a261",
+                        "winkelfunctie", "#e9c46a",
+                        "logiesfunctie", "#2a9d8f",
+                        "#999999"  // default
+                    ],
+                    "fill-opacity": 0.7
+                }
+            }
+        ]
+    }
+});
+```
+
+### Finding PMTiles URLs
+
+Look in `collection.json` for PMTiles assets:
+
+```json
+{
+  "assets": {
+    "pmtiles": {
+      "href": "./data.pmtiles",
+      "type": "application/vnd.pmtiles",
+      "roles": ["visual"]
+    }
+  }
+}
+```
+
+The `href` is relative to the collection.json location. Construct the full URL by combining the catalog base URL with the collection path and the href.
+
+### Finding the source-layer Name
+
+The `source-layer` in MapLibre must match the layer name inside the PMTiles file. Common patterns:
+- Often matches the filename stem (e.g., `buildings.pmtiles` → source-layer `"buildings"`)
+- Check PMTiles metadata if unsure: use the pmtiles JS library or `pmtiles show data.pmtiles` CLI
+
+### Data-Driven Styling
+
+Use MapLibre expressions to style features by their attributes — color by category, size by value, filter interactively:
+
+```javascript
+// Color by category
+"fill-color": ["match", ["get", "category"],
+    "residential", "#4361ee",
+    "commercial", "#e63946",
+    "#999999"
+]
+
+// Opacity by numeric value
+"fill-opacity": ["interpolate", ["linear"], ["get", "value"], 0, 0.1, 100, 0.9]
+
+// Filter to show only specific features
+"filter": ["==", ["get", "status"], "active"]
+```
+
+### Interactive Features
+
+Add popups, hover effects, and click handlers for exploration:
+
+```javascript
+// Popup on click
+map.on("click", "buildings-fill", (e) => {
+    const props = e.features[0].properties;
+    new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML(`<strong>${props.name}</strong><br/>Type: ${props.category}`)
+        .addTo(map);
+});
+
+// Highlight on hover
+map.on("mouseenter", "buildings-fill", () => map.getCanvas().style.cursor = "pointer");
+map.on("mouseleave", "buildings-fill", () => map.getCanvas().style.cursor = "");
+```
+
+### deck.gl (for 3D / Analytical Overlays)
+
+Use deck.gl only when you need 3D extrusion, heatmaps, or analytical overlays that MapLibre can't handle. Still use PMTiles as the data source via `MVTLayer`:
+
+```javascript
+import { Deck } from '@deck.gl/core';
+import { MVTLayer } from '@deck.gl/geo-layers';
+
+new Deck({
+    initialViewState: { longitude: 5.5, latitude: 52.0, zoom: 7, pitch: 45 },
     controller: true,
     layers: [
-        new deck.GeoJsonLayer({
-            id: "data",
-            data: "output.geojson",  // Or use MVTLayer for PMTiles
-            filled: true,
+        new MVTLayer({
+            data: "https://example.com/catalog/buildings/buildings.pmtiles",
             getFillColor: [51, 136, 255, 160],
-            getLineColor: [34, 102, 204],
-            getLineWidth: 1,
+            getElevation: d => d.properties.height * 10,
+            extruded: true,
             pickable: true
         })
     ]
 });
-</script>
-</body>
-</html>
-```
-
-For PMTiles with deck.gl, use `MVTLayer`:
-
-```javascript
-new deck.MVTLayer({
-    id: "pmtiles-layer",
-    data: "https://data.source.coop/user/catalog/collection/data.pmtiles",
-    getFillColor: [51, 136, 255, 160],
-    getLineColor: [34, 102, 204],
-    pickable: true
-})
 ```
 
 ### COG (Cloud-Optimized GeoTIFF) Visualization
 
-For raster data served as COGs, use Titiler or a client-side renderer:
+For raster data served as COGs:
 
 ```javascript
-// With MapLibre + COG protocol
-// Requires a tile server like Titiler, or use client-side rendering with geotiff.js
 const map = new maplibregl.Map({ /* ... */ });
 map.addSource("raster", {
     type: "raster",
@@ -517,7 +616,6 @@ map.addLayer({ id: "raster-layer", type: "raster", source: "raster" });
 For COPC (Cloud-Optimized Point Cloud) data:
 
 ```html
-<!-- Potree viewer for COPC -->
 <!DOCTYPE html>
 <html>
 <head>
@@ -527,8 +625,6 @@ For COPC (Cloud-Optimized Point Cloud) data:
 <body>
 <div id="viewer"></div>
 <script>
-// Potree supports COPC natively
-// Point to your COPC file URL
 const viewer = new Potree.Viewer(document.getElementById("viewer"));
 Potree.loadPointCloud("https://path/to/data.copc.laz", "pointcloud", (e) => {
     viewer.scene.addPointCloud(e.pointcloud);
