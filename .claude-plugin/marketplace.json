@@ -1,0 +1,19 @@
+{
+  "name": "portolan-skills",
+  "owner": {
+    "name": "Portolan SDI"
+  },
+  "metadata": {
+    "description": "Portolan skills for Claude Code and other AI agents",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "portolan",
+      "source": "./",
+      "description": "Skills for working with Portolan cloud-native geospatial data catalogs — publishing with portolan-cli and analyzing/visualizing Portolan-compliant datasets.",
+      "version": "0.1.0",
+      "keywords": ["portolan", "stac", "geospatial", "geoparquet", "cloud-native", "duckdb", "maplibre", "pmtiles", "cog", "copc"]
+    }
+  ]
+}

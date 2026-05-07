@@ -1,0 +1,12 @@
+{
+  "name": "portolan",
+  "description": "Skills for working with Portolan cloud-native geospatial data catalogs — publishing with portolan-cli and analyzing/visualizing Portolan-compliant datasets.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Portolan SDI"
+  },
+  "homepage": "https://github.com/portolan-sdi/portolan-skills",
+  "repository": "https://github.com/portolan-sdi/portolan-skills",
+  "license": "Apache-2.0",
+  "keywords": ["portolan", "stac", "geospatial", "geoparquet", "cloud-native", "duckdb", "maplibre", "pmtiles", "cog", "copc"]
+}
