@@ -110,6 +110,8 @@ print(collection.get("item_assets")) # Schema for item-level assets (partitioned
 **Important STAC fields for analysis:**
 - `assets.data.href` — Path to the GeoParquet file (relative to collection.json)
 - `assets.pmtiles.href` — Path to PMTiles visualization file
+- `portolan:styles` — Array of style identifiers (e.g., `["styles/default", "styles/by-category"]`)
+- Assets with `"roles": ["style"]` — MapLibre GL style JSONs for visualization (see Step 5)
 - `extent.spatial.bbox` — Bounding box `[west, south, east, north]`
 - `extent.temporal.interval` — Time range of the data
 
@@ -394,15 +396,182 @@ ogr2ogr output.gpkg /vsiaz/container/path/data.parquet
 
 **Always use MapLibre GL JS + PMTiles protocol** for interactive maps. This is the standard stack for Portolan visualization.
 
-When building a map:
-1. Find the `.pmtiles` URL from the collection's assets in `collection.json`
-2. Use MapLibre GL JS with the `pmtiles` protocol
-3. Add multiple PMTiles sources when visualizing data from multiple collections
-4. Style with MapLibre expressions for data-driven rendering (color by category, filter by attribute, etc.)
+### Check for Style JSONs First
 
-### MapLibre + PMTiles (Default)
+Many Portolan collections ship pre-built MapLibre GL style JSONs in a `styles/` directory. **Always check for these before writing styles from scratch** — they provide curated, data-driven cartography that's ready to use or adapt.
 
-This is the template for every interactive map. Adapt the URLs, source-layer names, and paint styles to your data:
+#### Discovering Styles
+
+Styles are referenced in `collection.json` in two ways:
+
+1. **`portolan:styles` array** — lists available style identifiers:
+   ```json
+   "portolan:styles": ["styles/default", "styles/by-category", "styles/by-crop"]
+   ```
+
+2. **Assets with `"roles": ["style"]`** — each style has an asset entry with href, title, and description:
+   ```json
+   {
+     "assets": {
+       "styles/default": {
+         "href": "./styles/default.json",
+         "type": "application/json",
+         "title": "Default",
+         "description": "Agricultural landscape with greens for grassland, yellow for arable crops.",
+         "roles": ["style"]
+       },
+       "styles/by-category": {
+         "href": "./styles/by-category.json",
+         "type": "application/json",
+         "title": "By Crop Category",
+         "description": "Distinct colors for each broad crop category.",
+         "roles": ["style"]
+       }
+     }
+   }
+   ```
+
+To find style files: scan the `assets` object in `collection.json` for entries where `roles` includes `"style"`. The `href` is relative to the collection.json location.
+
+#### Style JSON Format
+
+Each style JSON is a complete MapLibre GL style document (version 8) with sources and layers. Example:
+
+```json
+{
+  "version": 8,
+  "name": "BRP Gewaspercelen — Default",
+  "sources": {
+    "data": {
+      "type": "vector",
+      "url": "pmtiles://../brp_gewaspercelen.pmtiles"
+    }
+  },
+  "layers": [
+    {
+      "id": "parcels-fill",
+      "type": "fill",
+      "source": "data",
+      "source-layer": "brp_gewaspercelen",
+      "paint": {
+        "fill-color": [
+          "match", ["get", "category"],
+          "Grasland", "#7EC850",
+          "Bouwland", "#E8D44D",
+          "Landschapselement", "#4AA02C",
+          "#90C060"
+        ],
+        "fill-opacity": 0.75
+      }
+    },
+    {
+      "id": "parcels-outline",
+      "type": "line",
+      "source": "data",
+      "source-layer": "brp_gewaspercelen",
+      "paint": { "line-color": "#3D6B2E", "line-width": 0.5 }
+    }
+  ]
+}
+```
+
+#### Resolving Relative PMTiles URLs
+
+Style JSONs use relative paths for their PMTiles sources (e.g., `pmtiles://../data.pmtiles`). When using them in a web map, resolve these to absolute URLs based on the collection's base URL:
+
+```javascript
+async function loadStyle(collectionBaseUrl, styleRelPath) {
+    const styleUrl = new URL(styleRelPath, collectionBaseUrl + "/").href;
+    const resp = await fetch(styleUrl);
+    const style = await resp.json();
+
+    for (const [key, source] of Object.entries(style.sources)) {
+        if (source.url && source.url.startsWith("pmtiles://")) {
+            const relativePmtiles = source.url.replace("pmtiles://", "");
+            const absolutePmtiles = new URL(relativePmtiles, styleUrl).href;
+            source.url = "pmtiles://" + absolutePmtiles;
+        }
+    }
+    return style;
+}
+```
+
+#### Using a Style JSON Directly
+
+When a collection has style JSONs, use them as the map's style — the simplest approach:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/pmtiles/dist/pmtiles.js"></script>
+    <style>body { margin: 0; } #map { width: 100%; height: 100vh; }</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
+
+const COLLECTION_BASE = "https://data.source.coop/user/catalog/collection";
+
+async function initMap() {
+    const resp = await fetch(`${COLLECTION_BASE}/styles/default.json`);
+    const style = await resp.json();
+
+    // Resolve relative PMTiles URLs to absolute
+    for (const source of Object.values(style.sources)) {
+        if (source.url && source.url.startsWith("pmtiles://")) {
+            const rel = source.url.replace("pmtiles://", "");
+            const abs = new URL(rel, `${COLLECTION_BASE}/styles/`).href;
+            source.url = "pmtiles://" + abs;
+        }
+    }
+
+    const map = new maplibregl.Map({ container: "map", style });
+    map.addControl(new maplibregl.NavigationControl());
+}
+initMap();
+</script>
+</body>
+</html>
+```
+
+#### Using Styles as Inspiration
+
+When building custom visualizations, **read the available style JSONs even if you don't use them directly**. They contain:
+- The correct `source-layer` name for the PMTiles file
+- Curated color palettes matched to the dataset's attribute values
+- Data-driven `match` expressions showing which attribute values exist and how they map to categories
+- Filter expressions for thematic views (e.g., showing only landscape elements)
+
+Extract the paint properties and expressions from a style JSON to use in your own map, or adapt the color scheme for a different visualization (e.g., using a style's color mapping in a deck.gl layer).
+
+#### Style Switcher
+
+When multiple styles are available, offer the user a way to switch between them:
+
+```javascript
+async function switchStyle(styleName) {
+    const resp = await fetch(`${COLLECTION_BASE}/styles/${styleName}.json`);
+    const style = await resp.json();
+    // Resolve relative URLs (same as above)
+    for (const source of Object.values(style.sources)) {
+        if (source.url && source.url.startsWith("pmtiles://")) {
+            const rel = source.url.replace("pmtiles://", "");
+            const abs = new URL(rel, `${COLLECTION_BASE}/styles/`).href;
+            source.url = "pmtiles://" + abs;
+        }
+    }
+    map.setStyle(style);
+}
+```
+
+### MapLibre + PMTiles (No Style JSON Available)
+
+When a collection has no style JSONs, fall back to building the style inline. This is the template:
 
 ```html
 <!DOCTYPE html>
@@ -451,7 +620,7 @@ map.addControl(new maplibregl.NavigationControl());
 
 ### Multiple Layers from Different Collections
 
-When visualizing data from multiple collections (e.g., parks + buildings), add each as a separate PMTiles source:
+When visualizing data from multiple collections (e.g., parks + buildings), add each as a separate PMTiles source. If either collection has style JSONs, extract their layer definitions and merge them into a single style:
 
 ```javascript
 const map = new maplibregl.Map({
@@ -495,14 +664,13 @@ const map = new maplibregl.Map({
                 source: "buildings",
                 "source-layer": "buildings",
                 paint: {
-                    // Data-driven styling — color by attribute
                     "fill-color": ["match", ["get", "gebruiksdoel"],
                         "woonfunctie", "#4361ee",
                         "industriefunctie", "#e63946",
                         "kantoorfunctie", "#f4a261",
                         "winkelfunctie", "#e9c46a",
                         "logiesfunctie", "#2a9d8f",
-                        "#999999"  // default
+                        "#999999"
                     ],
                     "fill-opacity": 0.7
                 }
@@ -533,6 +701,7 @@ The `href` is relative to the collection.json location. Construct the full URL b
 ### Finding the source-layer Name
 
 The `source-layer` in MapLibre must match the layer name inside the PMTiles file. Common patterns:
+- **Check a style JSON first** — if the collection has styles, the `source-layer` value is already set correctly in the layer definitions
 - Often matches the filename stem (e.g., `buildings.pmtiles` → source-layer `"buildings"`)
 - Check PMTiles metadata if unsure: use the pmtiles JS library or `pmtiles show data.pmtiles` CLI
 
@@ -658,6 +827,7 @@ When a user points you at a Portolan catalog and asks questions:
 4. **Identify the right parquet file(s)** from the collection assets (look for `assets.data.href` or browse asset entries with `type: "application/vnd.apache.parquet"`)
 5. **Query with DuckDB** — answer the question with SQL
 6. **For cross-dataset questions** — join across collection parquet files using spatial predicates
+7. **For visualization** — check for style JSONs (assets with `"roles": ["style"]`) before building custom styles. Use them directly or extract their color palettes and expressions as a starting point.
 
 ### Example: "How many national parks are in the Netherlands?"
 
