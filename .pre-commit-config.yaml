@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: generate-readme
+        name: Generate README skills section
+        entry: python scripts/generate-readme.py
+        language: python
+        pass_filenames: false
+        files: ^skills/.*/SKILL\.md$|^README\.md$

@@ -4,36 +4,30 @@ AI agent skills for working with [Portolan](https://github.com/portolan-sdi/port
 
 Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
 
+<!-- BEGIN GENERATED: skills -->
 ## Skills
-
-### `portolan-cli`
-
-Guides AI agents through publishing and managing Portolan catalogs with the [portolan-cli](https://github.com/portolan-sdi/portolan-cli). Covers catalog initialization, format conversion (GeoParquet, COG, COPC), versioning, sync to object storage, and partitioning workflows.
-
-### `reading-portolan`
-
-Guides AI agents through exploring, querying, analyzing, and visualizing data from any Portolan-compliant catalog. Covers:
-
-- Navigating STAC catalog trees (including nested sub-catalogs)
-- Querying GeoParquet with DuckDB (local and remote via HTTP range requests)
-- Geospatial analysis — spatial joins, area/distance calculations, buffering
-- Cross-dataset joins across collections
-- Converting to legacy formats (Shapefile, GeoPackage, GeoTIFF) with GDAL/OGR
-- Interactive maps with PMTiles + MapLibre GL JS
-- Large dataset / 3D visualization with deck.gl
-- Point cloud rendering with COPC + Potree
 
 ### `portolan-bootstrap`
 
-End-to-end workflow for creating a complete geospatial catalog from any source. Guides through discovery, extraction/conversion, remote setup, asset generation, metadata enrichment, and push operations with checkpoint prompts throughout.
+End-to-end catalog creation from a data source - extract, enrich metadata, generate assets, push to remote
+
+### `portolan-cli`
+
+Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
 
 ### `portolan-consume`
 
-Focused guide for querying and exploring Portolan/STAC catalogs. Covers environment detection, URL protocol handling, GeoParquet optimizations (Hilbert ordering, bbox filtering), partitioned dataset queries, and troubleshooting.
+Guide users through querying and exploring Portolan/STAC catalogs with optimized GeoParquet and COGs
+
+### `reading-portolan`
+
+Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers navigating STAC metadata, querying GeoParquet with DuckDB, cross-dataset joins, geospatial analysis, and creating interactive maps with PMTiles/MapLibre/deck.gl/Potree.
 
 ### `sourcecoop`
 
-Step-by-step workflow for uploading data to Source Cooperative. Covers credential setup, catalog initialization, metadata creation, README generation, and push operations with Source Co-op specific requirements and troubleshooting.
+Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI.
+
+<!-- END GENERATED: skills -->
 
 ## Install
 
