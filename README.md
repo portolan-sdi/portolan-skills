@@ -23,6 +23,18 @@ Guides AI agents through exploring, querying, analyzing, and visualizing data fr
 - Large dataset / 3D visualization with deck.gl
 - Point cloud rendering with COPC + Potree
 
+### `portolan-bootstrap`
+
+End-to-end workflow for creating a complete geospatial catalog from any source. Guides through discovery, extraction/conversion, remote setup, asset generation, metadata enrichment, and push operations with checkpoint prompts throughout.
+
+### `portolan-consume`
+
+Focused guide for querying and exploring Portolan/STAC catalogs. Covers environment detection, URL protocol handling, GeoParquet optimizations (Hilbert ordering, bbox filtering), partitioned dataset queries, and troubleshooting.
+
+### `sourcecoop`
+
+Step-by-step workflow for uploading data to Source Cooperative. Covers credential setup, catalog initialization, metadata creation, README generation, and push operations with Source Co-op specific requirements and troubleshooting.
+
 ## Install
 
 ### Claude Code (CLI & Desktop)
@@ -32,7 +44,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available as `portolan:portolan-cli` and `portolan:reading-portolan`.
+Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, and `portolan:sourcecoop`.
 
 ### Claude Code (Web / Cowork)
 
@@ -43,12 +55,21 @@ The web app at [claude.ai/code](https://claude.ai/code) does not currently suppo
 Gemini CLI natively supports the same `SKILL.md` format:
 
 ```bash
-# Install both skills at user scope
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git --path skills/portolan-cli --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git --path skills/reading-portolan --consent
+# Install skills at user scope
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-cli --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/reading-portolan --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-bootstrap --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-consume --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/sourcecoop --consent
 
 # Or at workspace scope (shared via version control)
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git --path skills/reading-portolan --scope workspace --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/reading-portolan --scope workspace --consent
 ```
 
 ### OpenAI Codex CLI
@@ -59,8 +80,7 @@ Codex CLI also supports `SKILL.md` files. Copy the skills into your project's `.
 # Clone and copy into your project
 git clone https://github.com/portolan-sdi/portolan-skills.git /tmp/portolan-skills
 mkdir -p .agents/skills
-cp -r /tmp/portolan-skills/skills/portolan-cli .agents/skills/
-cp -r /tmp/portolan-skills/skills/reading-portolan .agents/skills/
+cp -r /tmp/portolan-skills/skills/* .agents/skills/
 ```
 
 ### Any AI Agent (Manual)
@@ -69,19 +89,6 @@ The skills are just markdown files. For any AI coding tool that supports custom 
 
 1. Copy the content of the relevant `SKILL.md` file
 2. Add it to your tool's custom instructions, system prompt, or project context file (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `.cursorrules`, etc.)
-
-## Sync
-
-The `portolan-cli` skill is kept in sync with the [SKILL.md](https://github.com/portolan-sdi/portolan-cli/blob/main/SKILL.md) in the portolan-cli repo.
-
-A [GitHub Action](.github/workflows/sync-cli-skill.yml) runs weekly (and can be triggered manually) to check for upstream changes. If the SKILL.md has changed, it opens a PR with the updated content so you can review before merging. The action prepends the skill frontmatter automatically.
-
-To sync manually:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/portolan-sdi/portolan-cli/main/SKILL.md -o /tmp/skill.md
-# Copy content after the frontmatter in skills/portolan-cli/SKILL.md
-```
 
 ## License
 
