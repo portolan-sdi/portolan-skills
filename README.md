@@ -23,6 +23,10 @@ Guide users through querying and exploring Portolan/STAC catalogs with optimized
 
 Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers navigating STAC metadata, querying GeoParquet with DuckDB, cross-dataset joins, geospatial analysis, and creating interactive maps with PMTiles/MapLibre/deck.gl/Potree.
 
+### `register-catalog`
+
+Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
+
 ### `sourcecoop`
 
 Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI.
@@ -38,7 +42,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, and `portolan:sourcecoop`.
+Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, `portolan:sourcecoop`, and `portolan:register-catalog`.
 
 ### Claude Code (Web / Cowork)
 
@@ -60,6 +64,8 @@ gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-consume --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/sourcecoop --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/register-catalog --consent
 
 # Or at workspace scope (shared via version control)
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
