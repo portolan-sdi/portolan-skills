@@ -7,6 +7,10 @@ Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open s
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
+### `chiitiler-thumbnails`
+
+Generate high-quality thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with optional basemap. Requires Node.js 18+.
+
 ### `portolan-bootstrap`
 
 End-to-end catalog creation from a data source - extract, enrich metadata, generate assets, push to remote
