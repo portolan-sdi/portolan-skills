@@ -35,17 +35,24 @@ print('OK:', c.get('id'), '-', c.get('title', '(no title)'))
 
 If the URL doesn't end in `catalog.json`, isn't reachable, or isn't a catalog root, stop and tell the user. Do not proceed with an invalid entry.
 
-## Step 2: Choose a slug
+## Step 2: Derive the slug
 
-Derive a short, kebab-case filename from the catalog `id` or `title` (e.g. `portolan-nl`, `pergamino-ide`). The file will be `catalogs/<slug>.yaml`. Confirm the slug with the user if ambiguous.
+The slug is the directory that contains `catalog.json` — the last path segment before the filename. No need to invent one.
+
+```bash
+# .../source-coop/nlebovits/ide-pergamino/catalog.json  ->  ide-pergamino
+SLUG=$(basename "$(dirname "$CATALOG_URL")")
+echo "$SLUG"
+```
+
+The file will be `catalogs/$SLUG.yaml`.
 
 ## Step 3: Open the PR
 
 Use `gh` to fork (if needed), branch, add the file, and open the PR — all without leaving the working directory:
 
 ```bash
-SLUG="your-catalog-slug"
-CATALOG_URL="https://example.com/stac/catalog.json"
+# CATALOG_URL and SLUG carry over from the steps above
 
 # Fork (no-op if already forked) and clone to a temp dir
 TMP=$(mktemp -d)
