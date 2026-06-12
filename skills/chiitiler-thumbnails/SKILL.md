@@ -56,7 +56,13 @@ fi
 PORT=13579
 echo "Starting chiitiler on port $PORT..."
 cd "$CHIITILER_DIR"
-npx tsx src/main.ts tile-server --port $PORT > /tmp/chiitiler.log 2>&1 &
+
+# Multi-process mode (CHIITILER_PROCESSES=0) prevents memory crashes on large batches
+# Memory cache improves performance for repeated basemap tile fetches
+CHIITILER_PROCESSES=0 npx tsx src/main.ts tile-server \
+    --port $PORT \
+    --cache memory \
+    > /tmp/chiitiler.log 2>&1 &
 SERVER_PID=$!
 
 # Wait for server to be ready
@@ -159,8 +165,8 @@ PYSTYLE
     # Cleanup temp file
     rm -f "$COLLECTION_DIR/.render-style.json"
     
-    # Verify output
-    if [ -f "$OUTPUT_FILE" ] && [ $(stat -c%s "$OUTPUT_FILE") -gt 1000 ]; then
+    # Verify output (100 byte threshold handles edge cases with tiny bboxes)
+    if [ -f "$OUTPUT_FILE" ] && [ $(stat -c%s "$OUTPUT_FILE") -gt 100 ]; then
         echo "✓ $COLLECTION_DIR → $(basename $OUTPUT_FILE) ($(stat -c%s "$OUTPUT_FILE") bytes)"
         ((COUNT++))
     else
@@ -184,7 +190,8 @@ PORT=13579
 
 # Start server (if not already running)
 cd "$CHIITILER_DIR"
-npx tsx src/main.ts tile-server --port $PORT &
+CHIITILER_PROCESSES=0 npx tsx src/main.ts tile-server \
+    --port $PORT --cache memory &
 SERVER_PID=$!
 sleep 3
 
@@ -271,7 +278,9 @@ The original `styles/default.json` is never modified. Only a temporary `.render-
 |-------|----------|
 | "npm install" fails | Ensure Node.js 18+: `node --version` |
 | Server won't start | Check port: `lsof -i :13579` |
+| Server crashes mid-batch | Ensure `CHIITILER_PROCESSES=0` is set (enables multi-process mode) |
 | Empty/black image | Verify PMTiles has data in the bbox extent |
+| Very thin/small image | Collection has near-zero bbox height/width — this is valid |
 | Basemap not loading | Check network access to tile server |
 | Very slow rendering | Large bbox or high zoom — reduce `SIZE` |
 
