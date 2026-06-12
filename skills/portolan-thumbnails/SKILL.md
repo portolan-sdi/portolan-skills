@@ -1,5 +1,5 @@
 ---
-name: chiitiler-thumbnails
+name: portolan-thumbnails
 description: Generate high-quality thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with optional basemap. Requires Node.js 18+.
 ---
 

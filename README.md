@@ -19,6 +19,10 @@ Use when publishing, managing, or converting cloud-native geospatial data catalo
 
 Guide users through querying and exploring Portolan/STAC catalogs with optimized GeoParquet and COGs
 
+### `portolan-thumbnails`
+
+Generate high-quality thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with optional basemap. Requires Node.js 18+.
+
 ### `reading-portolan`
 
 Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers navigating STAC metadata, querying GeoParquet with DuckDB, cross-dataset joins, geospatial analysis, and creating interactive maps with PMTiles/MapLibre/deck.gl/Potree.
