@@ -25,7 +25,7 @@ Use when exploring, querying, analyzing, or visualizing data from a Portolan cat
 
 ### `register-catalog`
 
-Register a STAC catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
+Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
 
 ### `sourcecoop`
 

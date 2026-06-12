@@ -1,6 +1,6 @@
 ---
 name: register-catalog
-description: Register a STAC catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
+description: Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
 ---
 
 
@@ -8,7 +8,7 @@ description: Register a STAC catalog in the Portolan registry by opening a pull 
 
 # Register a Catalog in the Portolan Registry
 
-You are helping a user add their STAC catalog to the [portolan-registry](https://github.com/portolan-sdi/portolan-registry) by opening a pull request. The registry crawls and validates submitted catalogs, then exports their metadata.
+You are helping a user add their Portolan catalog to the [portolan-registry](https://github.com/portolan-sdi/portolan-registry) by opening a pull request. The registry crawls and validates submitted catalogs, then exports their metadata. (Portolan uses STAC to organize its `catalog.json`, but a Portolan catalog is its own thing — don't call it a STAC catalog.)
 
 ## Key fact: submitters provide only the URL
 
@@ -22,18 +22,18 @@ CI auto-extracts everything else (title, description, bbox, license, counts, etc
 
 ## Step 1: Validate the catalog URL
 
-The URL must end in `catalog.json` and point to a reachable, valid STAC catalog root.
+The URL must end in `catalog.json` and point to a reachable Portolan catalog root.
 
 ```bash
 curl -fsSL "$CATALOG_URL" | python3 -c "
 import sys, json
 c = json.load(sys.stdin)
-assert c.get('type') == 'Catalog', f\"not a STAC Catalog (type={c.get('type')})\"
+assert c.get('type') == 'Catalog', f\"not a catalog root (type={c.get('type')})\"
 print('OK:', c.get('id'), '-', c.get('title', '(no title)'))
 "
 ```
 
-If the URL doesn't end in `catalog.json`, isn't reachable, or isn't a STAC Catalog, stop and tell the user. Do not proceed with an invalid entry.
+If the URL doesn't end in `catalog.json`, isn't reachable, or isn't a catalog root, stop and tell the user. Do not proceed with an invalid entry.
 
 ## Step 2: Choose a slug
 
