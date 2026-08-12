@@ -48,6 +48,29 @@ is authoritative; do not improvise around it. In summary:
 4. Rewrite the root `README.md`.
 5. Add collections under `catalog/`, each with a `child` link from the root.
 
+`SETUP.md` stops at the catalog's own metadata. Add two more links to
+`catalog/catalog.json` by hand. The template ships neither, because it cannot
+know the repository URL before the repository exists.
+
+```json
+{
+  "rel": "vcs",
+  "href": "https://github.com/<owner>/<name>",
+  "title": "Source repository"
+},
+{
+  "rel": "issues",
+  "href": "https://github.com/<owner>/<name>/issues",
+  "title": "Issue tracker"
+}
+```
+
+Use absolute URLs. The repository sits outside the published catalog, so a
+relative href resolves against the bucket. `vcs` is the first thing Mode C
+looks for. `issues` gives a reader who spots a wrong license somewhere to say
+so. Both are a recommended convention rather than a Core requirement, so
+`rashid` will not remind you.
+
 Every placeholder is marked `TODO(setup)`. Find what is left with:
 
 ```bash
@@ -80,6 +103,12 @@ Data files never enter git. Build them, upload them to the bucket, and write
 STAC that references them by their public URL. The `.gitignore` already blocks
 the common formats, so a stray `git add` of a Parquet file is refused.
 
+Item collections that run to thousands of files should be generated, not
+committed. Write a STAC-GeoParquet item index to the bucket and point
+`collection.json` at that `items.parquet`, so a client reads one index instead
+of thousands of item files. Fields of the World does this for roughly 45,000
+Sentinel-2 tiles, and `.gitignore` enforces the policy.
+
 Once a collection exists, run the gates before committing. `test_links.py`
 catches the most common mistake, which is adding a `child` link before the
 directory it points at exists.
@@ -95,7 +124,7 @@ python3 tools/publish.py            # dry run: what would change
 python3 tools/publish.py --confirm  # upload; needs AWS credentials
 ```
 
-Four things worth knowing before you touch someone's catalog:
+Five things worth knowing before you touch someone's catalog:
 
 - **Publishing never deletes.** Removing a file from `catalog/` does not
   unpublish it. Delete the object yourself if that is the intent.
@@ -110,6 +139,12 @@ Four things worth knowing before you touch someone's catalog:
 - **Content types matter.** After changing how a file type is mapped, publish
   with `--force`. A bucket listing carries no Content-Type, so change detection
   cannot see that a mapping moved.
+- **`stac-check` is advisory; `rashid` is the gate.** Some of its
+  best-practice notes contradict Portolan deliberately. It recommends a `self`
+  link, which Portolan forbids, because a static catalog that hardcodes its own
+  location cannot be mirrored or moved. `tests/test_stac_valid.py` prints those
+  notes as warnings and does not fail on them. Do not add a `self` link to
+  quiet one.
 
 ## Mode C — Contribute to someone else's catalog
 
@@ -117,12 +152,13 @@ You have a published `catalog.json` and want to fix something in it.
 
 ### Finding the repository
 
-Portolan has not standardized how a catalog points back at its repository, so
-check all three encodings and prefer them in this order: an explicit `vcs` link,
-then `git:repository`, then a `host` provider whose `url` is a repository. The
-third is the weakest signal, because a provider `url` means "where this
-organization can be reached" and a repository there is indistinguishable from a
-homepage.
+Portolan recommends that a git-backed catalog publish a `vcs` link to its
+repository and an `issues` link to its tracker. Check those first. They are a
+convention rather than a requirement, and catalogs published before it carry
+neither, so fall back to `git:repository` and then to a `host` provider whose
+`url` is a repository. The last is the weakest signal, because a provider `url`
+means "where this organization can be reached" and a repository there is
+indistinguishable from a homepage.
 
 ```bash
 CATALOG_URL="https://data.source.coop/example/catalog.json"
@@ -130,12 +166,14 @@ curl -fsSL "$CATALOG_URL" | python3 -c '
 import json, sys
 doc = json.load(sys.stdin)
 
-# 1. A vcs link relation.
+# 1. The recommended link relations. Separate purposes, so read both.
 for link in doc.get("links", []):
-    if link.get("rel") in ("vcs", "issues"):
-        print("vcs link:", link["href"]); break
+    if link.get("rel") == "vcs":
+        print("vcs link:", link["href"])
+    if link.get("rel") == "issues":
+        print("issues link:", link["href"])
 
-# 2. The git:repository field.
+# 2. A git:repository field. Not a Portolan field, but published in the wild.
 if doc.get("git:repository"):
     print("git:repository:", doc["git:repository"])
 
@@ -159,10 +197,11 @@ that carries nothing machine-readable may still say it there.
 from the catalog id or the organization name. A pull request opened against the
 wrong repository wastes a stranger's time.
 
-This fallback chain encodes a convention the spec has not agreed. It is
-tracked in
-[portolan-spec#145](https://github.com/portolan-sdi/portolan-spec/issues/145)
-and this section changes when that lands.
+A validator cannot demand these links, because a published catalog does not say
+whether a repository exists, so the fallbacks stay. If the catalog you are
+fixing carries no `vcs` or `issues` link, adding both is a good first pull
+request. The reasoning is in
+[Link a catalog to its repository](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/git-backed-catalogs.md#link-a-catalog-to-its-repository).
 
 ### Opening the pull request
 
