@@ -7,6 +7,10 @@ Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open s
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
+### `git-backed-catalog`
+
+Create, maintain, or contribute to a Portolan catalog whose metadata lives in a git repository, with CI validating every change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
+
 ### `portolan-bootstrap`
 
 End-to-end catalog creation from a data source - extract, enrich metadata, generate assets, push to remote
