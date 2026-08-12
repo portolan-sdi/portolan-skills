@@ -13,7 +13,7 @@ Create, maintain, or contribute to a Portolan catalog whose metadata lives in a 
 
 ### `portolan-bootstrap`
 
-End-to-end catalog creation from a data source - extract, enrich metadata, generate assets, push to remote
+Build a complete, well-documented Portolan catalog from a data source — research the data and its publisher, convert to cloud-native formats, write documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
 
 ### `portolan-cli`
 
@@ -25,7 +25,7 @@ Guide users through querying and exploring Portolan/STAC catalogs with optimized
 
 ### `portolan-thumbnails`
 
-Generate high-quality thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with optional basemap. Requires Node.js 18+.
+Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with an optional basemap, frames every bbox to the browser card's 3:2 shape, and gates each image on an automated blank probe plus a visual review. Requires Node.js 18+.
 
 ### `reading-portolan`
 
@@ -54,7 +54,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, `portolan:sourcecoop`, `portolan:register-catalog`, and `portolan:report-catalog-issue`.
+Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-consume`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
 ### Claude Code (Web / Cowork)
 
@@ -67,19 +67,23 @@ Gemini CLI natively supports the same `SKILL.md` format:
 ```bash
 # Install skills at user scope
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-cli --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/reading-portolan --consent
+  --path skills/git-backed-catalog --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-bootstrap --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-cli --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-consume --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/sourcecoop --consent
+  --path skills/portolan-thumbnails --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/reading-portolan --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/register-catalog --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/report-catalog-issue --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/sourcecoop --consent
 
 # Or at workspace scope (shared via version control)
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \

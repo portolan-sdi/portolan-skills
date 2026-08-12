@@ -83,8 +83,13 @@ Validate a Portolan catalog or check files for cloud-native status.
 portolan check                        # Validate all (metadata + geo-assets)
 portolan check --metadata             # Validate metadata only
 portolan check --geo-assets           # Check geo-assets only
+portolan check --no-data              # Skip the data pass (no asset bytes read)
+portolan check --live                 # Also probe the published host for Range + CORS
 portolan check --fix                  # Fix both metadata and geo-assets
+portolan check --fix --dry-run        # Preview the fixes
 ```
+
+Every default pass is offline. `--live` is the only one that makes requests to the published host, and `--url` overrides the base URL it probes.
 
 ### `portolan add`
 Track files in the catalog.
@@ -94,7 +99,14 @@ portolan add demographics/census.parquet
 portolan add file1.geojson file2.geojson   # Add multiple files
 portolan add imagery/                      # Add all files in directory
 portolan add .                             # Add all files in catalog
+portolan add . --datetime 2024-06-15       # Acquisition date for every item added
+portolan add . --workers 8                 # Parallel metadata extraction (default 1)
+portolan add . --pmtiles                   # Generate PMTiles too (requires tippecanoe)
+portolan add . --pmtiles --force-pmtiles   # Regenerate PMTiles that are already current
+portolan add . --stac-geoparquet           # Also write items.parquet for the collections touched
 ```
+
+`--merge-strategy` controls what happens to existing metadata: `smart` (default) keeps human-authored titles and descriptions while refreshing machine-derived fields, `keep` preserves everything, `overwrite` replaces it. Items added without `--datetime` are marked provisional and `portolan check` flags them.
 
 ### `portolan push`
 Push local catalog changes to cloud object storage.
@@ -182,32 +194,50 @@ portolan partition buildings.parquet output/ --target-rows 50000
 ```
 
 ### `portolan extract`
-Extract data from external sources into Portolan catalogs.
+Extract data from external sources into Portolan catalogs. Three subcommands: `arcgis`, `wfs`, and `carto`. Each takes the service URL and an optional positional `OUTPUT_DIR`. There is no `--output` flag.
 
 ```bash
+# ArcGIS FeatureServer, MapServer, ImageServer, or a services root
 portolan extract arcgis https://services.arcgis.com/.../FeatureServer ./output
 portolan extract arcgis URL --layers "Census*" --dry-run
 portolan extract arcgis URL --filter "sdn_*" --resume
+
+# WFS endpoints (default output dir: wfs_extract)
+portolan extract wfs https://example.com/wfs ./output
+portolan extract wfs URL --layers "buildings*,roads*" --wfs-version 2.0.0
+portolan extract wfs URL --bbox "-122.5,37.5,-122.0,38.0" --workers 4
+
+# Carto SQL API accounts (default output dir: carto_extract)
+portolan extract carto https://phl.carto.com ./output
+portolan extract carto URL --tables "vacant_*" --dry-run
+portolan extract carto URL --tables my_table --where "updated_at > '2026-01-01'"
 ```
 
+All three share `--dry-run` to list what would be extracted, `--resume` to skip layers already recorded in `extraction-report.json`, `--raw` to skip catalog init, and `--license` / `--license-url`, which are required unless the source publishes a license of its own.
+
 ### `portolan metadata`
-Manage catalog metadata for README generation.
+Manage catalog metadata for README generation. Both subcommands walk the whole catalog by default; `--no-recursive` limits them to the given path.
 
 ```bash
-portolan metadata init                # Create template at catalog root
-portolan metadata init demographics   # Create template for collection
-portolan metadata validate            # Validate metadata.yaml
+portolan metadata init                       # Create templates at every level
+portolan metadata init demographics          # Create templates under a collection
+portolan metadata init --no-recursive        # Catalog root only
+portolan metadata validate                   # Validate every metadata.yaml
+portolan metadata validate --no-recursive    # Catalog root only
 ```
 
 ### `portolan readme`
-Generate README.md from STAC metadata and metadata.yaml.
+Generate README.md from STAC metadata and metadata.yaml. Generates for the catalog and every collection by default.
 
 ```bash
-portolan readme                    # Generate at catalog root
-portolan readme demographics       # Generate for collection
-portolan readme --stdout           # Print without writing
+portolan readme                    # Generate for catalog and all collections
+portolan readme demographics       # Generate under a collection
+portolan readme --no-recursive     # Only at the given path
+portolan readme --stdout --no-recursive  # Print a single README without writing
 portolan readme --check            # CI mode: exit 1 if stale
 ```
+
+The README is an output. Edit `.portolan/metadata.yaml` and regenerate rather than hand-editing it.
 
 ### `portolan stac-geoparquet`
 Generate items.parquet for efficient STAC queries.

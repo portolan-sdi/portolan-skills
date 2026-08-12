@@ -23,6 +23,8 @@ Pick the mode that matches what the user asked for.
 
 ## Mode A — Create a new git-backed catalog
 
+This path keeps catalog metadata in a repository and validates every change in CI, which suits a catalog that takes contributions or needs rollback. If the user instead wants to convert a data source and publish it to a bucket, use the `portolan-bootstrap` skill for that data-first path.
+
 Start from the template rather than scaffolding by hand. It ships with a stub catalog that passes `rashid` on the first commit, so CI can be green before the catalog is populated.
 
 ```bash
