@@ -4,21 +4,22 @@ description: Register a Portolan catalog in the Portolan registry by opening a p
 ---
 
 
-<!-- freshness: last-verified: 2026-06-12, maps-to: portolan-sdi/portolan-registry -->
+<!-- freshness: last-verified: 2026-08-12, maps-to: portolan-sdi/portolan-registry -->
 
 # Register a Catalog in the Portolan Registry
 
 You are helping a user add their Portolan catalog to the [portolan-registry](https://github.com/portolan-sdi/portolan-registry) by opening a pull request. The registry crawls and validates submitted catalogs, then exports their metadata. (Portolan uses STAC to organize its `catalog.json`, but a Portolan catalog is its own thing — don't call it a STAC catalog.)
 
-## Key fact: submitters provide only the URL
+## Key fact: submitters provide a URL and an address
 
-A registry entry is a single YAML file with **one field**:
+A registry entry is a single YAML file with two fields, both required:
 
 ```yaml
 url: https://example.com/stac/catalog.json
+submitter_email: you@example.org
 ```
 
-CI auto-extracts everything else (title, description, bbox, license, counts, etc.) by crawling the catalog. **Never** add other fields or invent metadata — the schema forbids it (`additionalProperties: false`).
+CI auto-extracts everything else (title, description, bbox, license, counts, etc.) by crawling the catalog. **Never** add other fields or invent metadata. The [schema](https://github.com/portolan-sdi/portolan-registry/blob/main/schema/entry.schema.json) forbids it (`additionalProperties: false`), and an entry missing either required field fails the registry check.
 
 ## Step 1: Validate the catalog URL
 
@@ -47,12 +48,22 @@ echo "$SLUG"
 
 The file will be `catalogs/$SLUG.yaml`.
 
-## Step 3: Open the PR
+## Step 3: Ask the user for the submitter address
+
+Ask the user which address to record, and wait for an answer. Never guess one, and never read it out of git config: the person answerable for a registration is not always the person running the command.
+
+Tell them what the address is for. The registry mails it when the catalog stops validating, and when someone files feedback against it. It stays in `catalogs/` and never reaches `exports/catalogs.json`.
+
+```bash
+SUBMITTER_EMAIL="you@example.org"  # supplied by the user
+```
+
+## Step 4: Open the PR
 
 Use `gh` to fork (if needed), branch, add the file, and open the PR — all without leaving the working directory:
 
 ```bash
-# CATALOG_URL and SLUG carry over from the steps above
+# CATALOG_URL, SLUG, and SUBMITTER_EMAIL carry over from the steps above
 
 # Fork (no-op if already forked) and clone to a temp dir
 TMP=$(mktemp -d)
@@ -62,7 +73,8 @@ cd "$TMP/portolan-registry"
 
 # Create the entry on a new branch
 git checkout -b "add-$SLUG"
-printf 'url: %s\n' "$CATALOG_URL" > "catalogs/$SLUG.yaml"
+printf 'url: %s\nsubmitter_email: %s\n' \
+  "$CATALOG_URL" "$SUBMITTER_EMAIL" > "catalogs/$SLUG.yaml"
 git add "catalogs/$SLUG.yaml"
 git commit -m "Add $SLUG catalog"
 git push -u origin "add-$SLUG"
@@ -74,10 +86,10 @@ gh pr create \
   --body "Registers \`$CATALOG_URL\` in the Portolan registry."
 ```
 
-## Step 4: Report
+## Step 5: Report
 
 Give the user the PR URL (printed by `gh pr create`) and explain that CI will crawl and validate the catalog, then export its metadata to `exports/catalogs.json` once merged.
 
 ## Alternative: web submission
 
-If the user prefers not to use GitHub, they can submit the same `catalog.json` URL through the web form at [portolan-sdi.org](https://www.portolan-sdi.org).
+If the user prefers not to use GitHub, the web form at [portolan-sdi.org](https://www.portolan-sdi.org) takes the same two values: the `catalog.json` URL and an email address.
