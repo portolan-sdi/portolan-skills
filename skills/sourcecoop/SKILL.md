@@ -4,7 +4,7 @@ description: Upload geospatial data to Source Cooperative with proper metadata a
 ---
 
 
-<!-- freshness: last-verified: 2026-04-08, maps-to: portolan_cli/cli.py -->
+<!-- freshness: last-verified: 2026-08-12, maps-to: portolan_cli/cli.py -->
 
 # Source Cooperative Upload Skill
 
@@ -33,13 +33,15 @@ portolan config get remote 2>/dev/null
 
 ## Workflow Overview
 
+This skill covers the upload path. To build the catalog itself from a data source — extraction, metadata enrichment, styles, thumbnails — use the `portolan-bootstrap` skill first, then return here to publish.
+
 The Source Co-op upload workflow follows these steps:
 
 1. **Initialize** — Create Portolan catalog structure
 2. **Configure** — Set remote destination and AWS profile
 3. **Add** — Track files in the catalog
-4. **Metadata** — Create/validate metadata.yaml (recursive)
-5. **README** — Generate READMEs from metadata (recursive)
+4. **Metadata** — Create and validate metadata.yaml across the catalog
+5. **README** — Generate READMEs from metadata
 6. **Push** — Upload to Source Co-op with parallel workers
 
 ---
@@ -149,11 +151,14 @@ portolan add imagery/
 
 ## Step 6: Create Metadata
 
-Source Cooperative emphasizes good metadata. Create metadata.yaml files recursively:
+Source Cooperative emphasizes good metadata. `portolan metadata init` walks the whole catalog by default, creating a template at every STAC level:
 
 ```bash
 # Initialize metadata templates for catalog and all collections
-portolan metadata init --recursive
+portolan metadata init
+
+# Only the catalog root, no subdirectories
+portolan metadata init --no-recursive
 ```
 
 **Required fields** (validate these exist):
@@ -169,8 +174,8 @@ portolan metadata init --recursive
 - `providers` — Organizations that created/host the data
 
 ```bash
-# Validate metadata after editing
-portolan metadata validate --recursive
+# Validate metadata after editing (walks the catalog by default)
+portolan metadata validate
 ```
 
 ---
@@ -179,10 +184,28 @@ portolan metadata validate --recursive
 
 ```bash
 # Generate READMEs for catalog and all collections
-portolan readme --recursive
+portolan readme
 
 # Verify READMEs look correct
 cat README.md
+```
+
+Never hand-edit a generated README. Edit `.portolan/metadata.yaml` and regenerate.
+
+---
+
+## Linking to Source Cooperative
+
+Source Cooperative serves the same objects under two hostnames, and they behave differently. `source.coop` renders a page a person can read: the repository description, the README, a file listing. `data.source.coop` returns raw bytes, so a browser opening one of those links shows unformatted JSON.
+
+Use `source.coop` for anything rendered for a human, and `data.source.coop` only where a machine fetches raw bytes.
+
+- **`source.coop`** — links in `metadata.yaml`, STAC `description` fields, generated READMEs, issue and pull request bodies, announcements.
+- **`data.source.coop`** — STAC asset `href` values, `curl`, DuckDB `read_parquet()`, HTTP range requests, anything a client resolves programmatically.
+
+```
+https://source.coop/{org}/{product}                       # human-facing page
+https://data.source.coop/{org}/{product}/catalog.json     # machine-facing bytes
 ```
 
 ---
@@ -248,29 +271,32 @@ Track files in the catalog.
 portolan add .                    # Add all files
 portolan add demographics/        # Add collection
 portolan add file1.parquet        # Add specific file
+portolan add . --pmtiles          # Also generate PMTiles (needs tippecanoe)
+portolan add . --workers 4        # Parallel metadata extraction
 ```
 
 ### `portolan metadata init`
 Generate a metadata.yaml template.
 
 ```bash
-portolan metadata init                # Create template at catalog root
-portolan metadata init --recursive    # Create for catalog and all collections
+portolan metadata init                  # Create templates at every level
+portolan metadata init --no-recursive   # Catalog root only
 ```
 
 ### `portolan metadata validate`
 Validate metadata.yaml against schema.
 
 ```bash
-portolan metadata validate            # Validate metadata.yaml
+portolan metadata validate                  # Validate every level
+portolan metadata validate --no-recursive   # Catalog root only
 ```
 
 ### `portolan readme`
 Generate README.md from STAC metadata and metadata.yaml.
 
 ```bash
-portolan readme                    # Generate at catalog root
-portolan readme --recursive        # Generate for catalog and all collections
+portolan readme                    # Generate for catalog and all collections
+portolan readme --no-recursive     # Catalog root only
 portolan readme --check            # CI mode: exit 1 if stale
 ```
 
@@ -338,7 +364,7 @@ portolan push --workers 8 --verbose
 
 **Solution:**
 ```bash
-portolan metadata validate --recursive
+portolan metadata validate
 # Edit metadata.yaml files to add missing fields
 # Required: title, description, license, contact.email
 ```
@@ -364,11 +390,11 @@ EOF
 portolan add .
 
 # 5. Create and edit metadata
-portolan metadata init --recursive
+portolan metadata init
 # Edit .portolan/metadata.yaml with title, description, license, contact
 
 # 6. Generate READMEs
-portolan readme --recursive
+portolan readme
 
 # 7. Push to Source Co-op
 portolan push --workers 8 --verbose
@@ -378,11 +404,11 @@ portolan push --workers 8 --verbose
 
 ## Styles
 
-Portolan supports multiple named visualization styles per collection. Each style is a complete Mapbox GL v8 JSON file stored in `{collection}/styles/`.
+A collection can ship several named visualization styles. Each one is a MapLibre GL style file (`"version": 8`) stored in `{collection}/styles/`.
 
 ### Creating Styles
 
-Style files are complete Mapbox GL v8 specs with relative PMTiles source paths:
+Style files are complete MapLibre GL styles with relative PMTiles source paths:
 
 ```json
 {
@@ -411,42 +437,42 @@ Style files are complete Mapbox GL v8 specs with relative PMTiles source paths:
 }
 ```
 
-A default style is auto-generated during PMTiles creation. Drop additional style files into `styles/` and they'll be discovered automatically.
-
-### Style Best Practices
-
-1. **Create multiple styles for rich collections.** If a collection has interesting categorical or numeric attributes, create data-driven styles for each. Example: buildings by construction year, by usage type, by height. Don't stop at a single default.
-
-2. **Vary default styles across a catalog.** Each collection should have a visually distinct default color/palette. Use subject matter to inform color choices — water features in blues, vegetation in greens, built environment in warm tones, infrastructure in grays.
-
-3. **Use data-driven styling.** Leverage Mapbox GL expressions (`interpolate`, `match`, `case`, `step`) to reveal patterns in data. For categorical data use `match`; for continuous data use `interpolate` or `step`.
-
-4. **Include a description field on the STAC asset** explaining what the colors/sizes represent. This appears in style pickers and tooltips.
-
-5. **Consider label layers.** For collections with names (monuments, administrative areas, roads), add a label style layer or a dedicated "with labels" style variant.
-
-6. **Look at the collection's table:columns** to understand what attributes are available for data-driven styling. Interesting fields for visualization include: categories/enums, dates/years, numeric measurements, status fields.
+A default style is written to `styles/default.json` when Portolan generates PMTiles. Drop additional style files into `styles/` and they are discovered from there.
 
 ### STAC Registration
 
-Styles are registered as collection-level assets with the `portolan:styles` manifest:
+Every style is a collection-level asset carrying the `style` role. Clients find a collection's styles by filtering assets on that role, so the Portolan spec defines no style manifest. When a collection ships more than one style, exactly one asset carries both `style` and `default` in its `roles`:
 
 ```json
 {
-  "portolan:styles": ["styles/default", "styles/by-age", "styles/by-use"],
   "assets": {
-    "styles/default": {
+    "style": {
       "href": "./styles/default.json",
       "type": "application/json",
-      "title": "Default",
-      "description": "Blue building footprints.",
+      "title": "Buildings by age",
+      "description": "Fill color runs from 1400 to 2020 construction year.",
+      "roles": ["style", "default"]
+    },
+    "style-by-use": {
+      "href": "./styles/by-use.json",
+      "type": "application/json",
+      "title": "Buildings by use",
       "roles": ["style"]
     }
   }
 }
 ```
 
-First entry in `portolan:styles` is the default. `portolan scan` discovers styles and registers them automatically.
+Asset keys carry no meaning to a client; `style-<variant>` is the convention. The reader sees the asset `title` in the style picker, so write titles for people rather than for filenames. Current CLI releases also write a legacy `portolan:styles` array next to these assets (`portolan_cli/viz/style.py`), which the spec no longer defines.
+
+### Style Craft
+
+The spec's [styling best practices](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/styling.md) cover how many styles to write, how to vary colors across a catalog, and when to add labels. Follow that guidance rather than restating it here.
+
+Two things are specific to publishing on Source Cooperative:
+
+- Style files are ordinary catalog assets, so they upload with `portolan push` and are served from the bucket. Keep the `sources.url` in each style file a relative path to the PMTiles asset, so the style keeps working wherever the catalog is mirrored.
+- Review styles as published, not only as JSON on disk. After pushing, open the collection in the Portolan browser: `https://browser.portolan-sdi.org/#/external/data.source.coop/{org}/{product}/{collection}/collection.json`.
 
 ---
 
