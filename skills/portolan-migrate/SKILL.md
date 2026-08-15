@@ -171,7 +171,7 @@ One of those baselines is worth knowing about. Re-running with the newer validat
 
 ### Declare One Schema Version
 
-Rashid resolves the profile schema from the **root** catalog, then validates every object against it. A root declaring v0.1.0 with children declaring v0.1.1 took one catalog from 239 errors to 378. Set the version once, at the root, and make the per-collection pass match it.
+Rashid resolves the profile schema from the **root** catalog, then validates every object against it. A root declaring v0.1.0 with children declaring v0.1.1 therefore makes every child disagree with the schema it was checked against. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings of `PTL-CNF-002`, one per object. Set the version once, at the root, and make the per-collection pass match it.
 
 A released schema is immutable, so the version is a real choice rather than a formality. Take it from the spec release you are targeting, not from what the CLI happens to emit, and expect the two to differ during a migration. The reference generators keep it in a module constant for this reason.
 
