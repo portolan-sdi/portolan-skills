@@ -81,6 +81,20 @@ python3 tests/run_all.py
 python3 tools/publish.py            # dry run; uploads nothing
 ```
 
+### Pin `rashid` in a Repository Virtualenv
+
+`tests/test_conformance.py` resolves the validator with `shutil.which("rashid")` and prints `SKIP: rashid is not installed` when it finds nothing. It therefore checks against whatever version happens to be on PATH, while CI installs a pinned one. Both migrations in August 2026 ran locally against a stale 0.1.4, which has no `PTL-LNK-007`, `PTL-LNK-008`, `PTL-LNK-009`, or `PTL-AST-006`, so the local gate passed a catalog the CI gate rejects.
+
+Install the pinned version into a repository virtualenv and pin the same version in `.github/workflows/ci.yml`:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install 'rashid==0.1.6' stac-check
+.venv/bin/rashid --version
+```
+
+Then run the gates through that interpreter, so the version the tests find is the version you chose.
+
 If the user is outside the `portolan-sdi` organization, follow `SETUP.md` step 10 and remove `.github/workflows/repo-checks.yml` and the `ops-sync` blocks. Those enforce that organization's contribution contract.
 
 ### Adding a collection
@@ -93,6 +107,22 @@ Fields of the World uses this approach for roughly 45,000 Sentinel-2 items.
 
 Once a collection exists, run the gates before committing. `test_links.py` catches a common mistake: adding a `child` link before the directory it points to exists.
 
+### Uploading Data That Lives Outside `catalog/`
+
+`tools/publish.py` syncs `publish_dir`, which is `catalog/`, and nothing else. That boundary is what keeps a scratch file out of a public bucket, so do not widen it. Data assets too large for git need a second uploader beside publish.py, writing into the same bucket prefix.
+
+Have that uploader import `load_config`, `split_s3_uri`, `content_type_for`, `remote_index`, `is_unchanged`, and `unedited_sentinels` from `publish.py` rather than reimplementing them. Change detection, content-type mapping, and the sentinel guard then cannot drift between the two paths.
+
+Scope it by path and again by file extension. In the microsoft-ml-road-detections migration in August 2026 the staging tree held 45 GB of GeoJSON that tippecanoe consumes and nobody should download, sitting beside the Parquet partitions and the PMTiles archive that ship. An allow-list of suffixes stays correct when new scratch appears. An exclusion list does not. Print a per-suffix breakdown in the dry run so an over-broad scope shows up before anything uploads.
+
+`tools/upload_data.py` in that repository is a working implementation, at 164 lines.
+
+### CI Is Red on the First Push
+
+`tests/test_links.py` resolves every relative link and asset href against the working tree. A fresh clone in CI has the metadata but not the bytes, because `.gitignore` keeps data out of git, so asset hrefs do not resolve and the gate fails there after passing locally.
+
+Gate the exemption on an environment variable rather than dropping the check. Pergamino's `tests/test_links.py` exempts a fixed tuple of data suffixes when `CI_LIGHT=1` is set, and nothing else. Structural links stay checked in both modes. It counts what it skipped and prints the count with a line telling the reader to run without `CI_LIGHT` locally, so the exemption stays visible instead of becoming a silent hole. Locally that catalog checks 2,175 hrefs. In CI it checks 1,628 and skips 547.
+
 ## Mode B — Maintain an existing catalog
 
 The normal loop is:
@@ -104,9 +134,10 @@ python3 tools/publish.py             # dry run
 python3 tools/publish.py --confirm   # upload; needs AWS credentials
 ```
 
-Five things matter when maintaining an existing catalog:
+Six things matter when maintaining an existing catalog:
 
 * **Publishing never deletes.** Removing a file from `catalog/` does not remove the object from the bucket. Delete the object separately if that is intended.
+* **Two publishers exist and they do not interoperate.** `portolan push` tracks what it has uploaded in `versions.json`, keyed on sha256. The template's `tools/publish.py` keeps no state and compares local size and MD5 against the remote listing's size and ETag. The `portolan-thumbnails` skill assumes the first, this skill assumes the second. Pick one per catalog and say which in the repository's own `AGENTS.md`.
 * **Edit the generator, not generated output.** If the repository has a `tools/` or `scripts/` pipeline, find the source of the generated catalog before editing `catalog/` directly.
 * **Do not widen the conformance allow-list to make CI pass.** If `tests/test_conformance.py` has an `ACCEPTED` set, adding a finding to it hides a real problem. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing does not contain `Content-Type`, so normal change detection may not notice the change.

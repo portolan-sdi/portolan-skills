@@ -11,6 +11,8 @@ This skill takes the data-first path: you hold the files, convert them, document
 
 If the user wants catalog metadata to live in a git repository, validated by CI and open to pull requests from other people, use the `git-backed-catalog` skill instead.
 
+If a catalog or a published dataset already exists and the job is to bring it into compliance rather than build it from scratch, use the `portolan-migrate` skill. It audits what is there and repairs it in place, leaving the underlying data alone unless a named requirement forces a change.
+
 ## The Goal
 
 A finished catalog clears three bars. Someone who has never seen the data can decide in one screen whether to trust it. An agent can write a correct query on the first try. Every collection renders something meaningful the moment it opens.
