@@ -171,7 +171,7 @@ One of those baselines is worth knowing about. Re-running with the newer validat
 
 ### Declare One Schema Version
 
-Rashid resolves the profile schema from the **root** catalog, then validates every object against it. A root declaring v0.1.0 with children declaring v0.1.1 took one catalog from 239 errors to 378. Set the version once, at the root, and make the per-collection pass match it.
+Rashid resolves the profile schema from the **root** catalog, then validates every object against it. A root declaring v0.1.0 with children declaring v0.1.1 therefore makes every child disagree with the schema it was checked against. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings of `PTL-CNF-002`, one per object. Set the version once, at the root, and make the per-collection pass match it.
 
 A released schema is immutable, so the version is a real choice rather than a formality. Take it from the spec release you are targeting, not from what the CLI happens to emit, and expect the two to differ during a migration. The reference generators keep it in a module constant for this reason.
 
@@ -234,7 +234,11 @@ The single highest-leverage fix in that entire migration was one sentence: `sour
 
 So before writing any style of your own, look for cartography the catalog already carries or the publisher still serves. Read the styling rules and the legend rule in `portolan-bootstrap`, which apply unchanged here.
 
-Two conversion limits to expect. The CLI's SLD converter handles categorical rules, where a filter is `PropertyIsEqualTo` and becomes a `match` expression. It rejects graduated class-break SLDs, whose rules carry a range filter instead. Those are frequently the publisher's most considered cartography: in one catalog, 81 of 92 SLDs converted and the 11 failures were all choropleths. `reference/tools/sld_graduated.py` converts them to a `step` expression.
+Two conversion limits to expect. The CLI's SLD converter handles categorical rules, where a filter is `PropertyIsEqualTo` and becomes a `match` expression. A graduated class-break SLD carries a range filter instead, and the converter **skips those rules in silence**. There is no warning and no entry in the conversion report, so a choropleth degrades to a flat style that looks intentional. Where every rule is graduated, the failure surfaces as the misleading `No valid symbolizers found in SLD rules`.
+
+Worse, a rule mixing equality with a range converts to something quietly wrong, because the filter search descends through the enclosing `And` and finds the equality alone.
+
+Those styles are frequently the publisher's most considered cartography. In one catalog 81 of 92 SLDs converted, and all 11 failures were choropleths. `reference/tools/sld_graduated.py` converts them to a `step` expression, which is also the form the browser can derive a legend from.
 
 ### Four Defects No Validator Sees
 
@@ -339,7 +343,11 @@ until grep -q 'DONE exit=' extract.log; do sleep 20; done
 
 ### Generated Metadata Overwrites Authored Metadata
 
-`portolan add` regenerates `collection.json` through hierarchical metadata resolution. In one migration that clobbered every collection's `title` with the catalog root's title, and reverted the `stac_extensions` schema URI to the version the CLI shipped rather than the one the spec release defined. A smart merge preserved `id`, `description`, `license`, and `providers`, so the damage was narrow but silent.
+`portolan add` regenerates `collection.json` through hierarchical metadata resolution. In one migration that clobbered every collection's `title` with the catalog root's title, and reverted the `stac_extensions` schema URI.
+
+Assume nothing survives. `license` and `providers` are overwritten outright whenever the merged metadata carries them, and `init` seeds both at the root, so the root's values reach every collection. `description` survives only where the merged metadata is blank, and `id` survives only because the existing file is reloaded first. The `SMART` merge strategy applies to assets and items, not to collection identity fields.
+
+The schema URI is not hardcoded either. The CLI stamps the highest version bundled by the rashid wheel it has installed, so the version you get tracks a dependency rather than the spec release you are targeting.
 
 Keep authored metadata in a generator and re-apply it as an idempotent last pass after **every** `add`. See `reference/tools/apply_metadata.py`. Add a CI gate that regenerates and diffs, so a hand-edit to generated output fails the build rather than surviving until the next regeneration wipes it.
 
