@@ -42,11 +42,8 @@ from pathlib import Path
 MASK = "\x00"  # Not prose. Never matched by a rule.
 KEEP = "\x01"  # Opaque, but counts as one word.
 
-STYLE = (
-    Path(__file__).resolve().parent.parent
-    / "output-styles"
-    / ("simplified-technical-english.md")
-)
+STYLE_DIR = Path(__file__).resolve().parent.parent / "output-styles"
+STYLE = STYLE_DIR / "simplified-technical-english.md"
 
 
 def rules_text() -> str:
@@ -143,9 +140,8 @@ class Doc:
         self._mask_comments(flags)
         self.kinds = self._mask_lines(flags)
         self._mask_inline(flags)
-        self.masked = "".join(
-            ch if ch == "\n" or not f else MASK for ch, f in zip(self.text, flags)
-        )
+        pairs = zip(self.text, flags, strict=True)
+        self.masked = "".join(ch if ch == "\n" or not f else MASK for ch, f in pairs)
 
     # -- construction helpers ------------------------------------------
     def _fill(self, flags: list[bool], start: int, end: int) -> None:
@@ -202,9 +198,8 @@ class Doc:
         return kinds
 
     def _mask_inline(self, flags: list[bool]) -> None:
-        live = "".join(
-            ch if (ch == "\n" or not f) else MASK for ch, f in zip(self.text, flags)
-        )
+        pairs = zip(self.text, flags, strict=True)
+        live = "".join(ch if (ch == "\n" or not f) else MASK for ch, f in pairs)
         for pattern in INLINE_MASKS:
             for m in pattern.finditer(live):
                 self._fill(flags, m.start(), m.end())
@@ -290,9 +285,8 @@ def sentences(doc: Doc) -> list[Sentence]:
         offset = 0
         for piece in SENTENCE_SPLIT_RE.split(guarded):
             if piece.strip(MASK + KEEP + " \t\n"):
-                out.append(
-                    Sentence(start + offset, chunk[offset : offset + len(piece)])
-                )
+                span = chunk[offset : offset + len(piece)]
+                out.append(Sentence(start + offset, span))
             offset += len(piece)
             # Re-align past the whitespace the split consumed.
             while offset < len(guarded) and guarded[offset] in " \t\n\"')]":
@@ -424,9 +418,8 @@ VOCAB: tuple[tuple[str, re.Pattern[str], str], ...] = (
     ),
 )
 
-FILLER_TEMPORAL_RE = re.compile(
-    r"just\s+(?:before|after|under|over|below|above|\d)", re.IGNORECASE
-)
+_TEMPORAL = r"just\s+(?:before|after|under|over|below|above|\d)"
+FILLER_TEMPORAL_RE = re.compile(_TEMPORAL, re.IGNORECASE)
 ROBUST_STATS_RE = re.compile(
     r"robust\s+(?:to|against|regression|estimator|standard\s+errors)",
     re.IGNORECASE,
@@ -557,9 +550,8 @@ BLOCK_MAX_WORDS = 20
 ADVISE_MAX_WORDS = 16
 ADVISE_MAX_SENTENCES = 6
 
-SUPPRESS_RE = re.compile(
-    r"<!--\s*ste-ok:\s*([A-Z_]+(?:\s+[A-Z_]+)*)\s+(.{8,}?)\s*-->", re.DOTALL
-)
+_SUPPRESS = r"<!--\s*ste-ok:\s*([A-Z_]+(?:\s+[A-Z_]+)*)\s+(.{8,}?)\s*-->"
+SUPPRESS_RE = re.compile(_SUPPRESS, re.DOTALL)
 SKIP_RE = re.compile(r"<!--\s*ste-skip:\s*(.{8,}?)\s*-->", re.DOTALL)
 
 
@@ -650,11 +642,9 @@ def review(body: str, kind: str) -> tuple[list[Finding], list[str]]:
         line = doc.line_of(start)
         if rule in per_line.get(line, set()):
             return
-        found.append(
-            Finding(
-                rule, line, doc.col_of(start), fix, doc.excerpt(start, end), blocking
-            )
-        )
+        col = doc.col_of(start)
+        text = doc.excerpt(start, end)
+        found.append(Finding(rule, line, col, fix, text, blocking))
 
     live = doc.masked
     if not live.replace(MASK, "").strip():
@@ -808,12 +798,10 @@ def _structure(doc: Doc, kind: str, per_line: dict[int, set[str]]) -> list[Findi
     for title, first, last in doc.section_bounds():
         if title.casefold().rstrip("?:") not in wanted:
             continue
-        if not _has_content(doc, first + 1, last) and (
-            "HEADING_EMPTY" not in per_line.get(first + 1, set())
-        ):
-            out.append(
-                Finding("HEADING_EMPTY", first + 1, 1, f'"## {title}" is empty', "")
-            )
+        muted = "HEADING_EMPTY" in per_line.get(first + 1, set())
+        if not _has_content(doc, first + 1, last) and not muted:
+            fix = f'"## {title}" is empty'
+            out.append(Finding("HEADING_EMPTY", first + 1, 1, fix, ""))
     return out
 
 
@@ -829,10 +817,9 @@ def report(findings: list[Finding], labels: list[str], kind: str) -> str:
     advisory = [f for f in findings if not f.blocking]
     noun = "pull request" if kind == "pr" else "issue"
     plural = "" if len(blocking) == 1 else "s"
-    headline = (
-        f"Writing review: {len(blocking)} blocking problem{plural} "
-        f"in this {noun} body. Fix and retry."
-    )
+    count = len(blocking)
+    headline = f"Writing review: {count} blocking problem{plural} in this "
+    headline += f"{noun} body. Fix and retry."
     lines = [headline, ""]
     lines.extend(f.format() for f in blocking[:MAX_SHOWN])
     if len(blocking) > MAX_SHOWN:
