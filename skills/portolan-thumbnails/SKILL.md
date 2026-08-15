@@ -555,6 +555,57 @@ map and nothing more; say so rather than burning attempts on it.
 Legibility problems that survive reframing belong to the style, not to this skill.
 The `sourcecoop` skill covers varying default styles.
 
+## Defects the Validators Miss
+
+Rendering 182 pergamino-ide collections in August 2026 surfaced four faults that
+`rashid` and `stac-check` both pass. Each reaches this skill as a failed request
+or a blank image, never as a finding.
+
+**A `symbol` layer with no `glyphs` endpoint kills the renderer.** MapLibre GL
+Native crashes when a layer needs a font it cannot fetch. The chiitiler worker
+dies and curl reports an empty reply rather than a status code, which reads like
+a server crash. Adding a `glyphs` entry turns the crash into a readable HTTP 500
+with `unknown pbf field type`. Keep the symbol layers in `styles/default.json`,
+where browsers render the labels, and strip them from the render and probe
+styles in `buildstyle.py`:
+
+```python
+layers = [l for l in layers if l.get("type") != "symbol"]
+```
+
+`https://fonts.openmaptiles.org/{fontstack}/{range}.pbf` is a `glyphs` source
+that works, for the case where you want labels in the image.
+
+**A `match` expression needs all-integer or all-string labels.** MapLibre
+rejects the style with HTTP 400 when the labels are floats (`0.9`, `1.0`, `1.1`)
+and again when integers sit beside a string (`227`, `330`, `"Linea 2"`). Coerce
+both sides to string. Wrap the getter as `["to-string", ["get", "col"]]`, write
+each integral float as an integer so `1.0` becomes `"1"`, and drop the duplicate
+labels that coercion creates.
+
+**Three paint patterns render blank, and no renderer is at fault.**
+`fill-opacity` of `0.0`, `circle-color` of `#ffffff` against the white
+background, and a white fill at partial opacity each produce a correct render of
+nothing. Raise the zero opacity. Give a white circle a `circle-stroke-color` and
+a `circle-stroke-width`, and a white fill a `fill-outline-color`.
+
+**A sparse collection can be tiled to zoom 0.** One two-feature collection had
+an archive stopping at `maxzoom 0`, which puts both points inside a single pixel,
+and no framing recovers that. Set `pmtiles.max_zoom` in `.portolan/config.yaml`
+and regenerate. That collection went to 23 tiles.
+
+Regenerating needs the generation path switched on. `portolan add` skips PMTiles
+for a collection unless `--pmtiles` was passed or `pmtiles.enabled` is true in
+config, and `--force-pmtiles` only sets the force flag on a generator it never
+reaches otherwise. Run both flags together:
+
+```bash
+portolan add publico_arbolado/ --pmtiles --force-pmtiles
+```
+
+Unchanged files do not block this. `add` counts a skipped file's collection as
+affected so that tile generation still runs over already-tracked data.
+
 ## Step 6 — Work Through the Catalog
 
 Cards are seen side by side, so judge them as a set. Aim for roughly a third
@@ -646,6 +697,8 @@ These are the environment failures.
 |-------|----------|
 | `npm install` fails | Check `node --version` is 18 or newer |
 | Server will not start | Check the port with `lsof -i :13579` and read `/tmp/chiitiler.log` |
+| Port already in use | Another session's chiitiler still holds 13579, and the bind failure reads like a crash. Start on a free port and export `PORT` so `render_one.sh` follows |
+| `curl` reports an empty reply | The worker died. A `symbol` layer with no `glyphs` endpoint is the usual cause. See Defects the Validators Miss |
 | Server dies when the command returns | Start it with `setsid ... & disown` so it outlives the shell |
 | Server crashes mid-batch | Set `CHIITILER_PROCESSES=0` for multi-process mode |
 | Basemap not loading | Check network access, and check the log for a truncated `{z` in the requested URL, which means the tile template did not survive the shell |

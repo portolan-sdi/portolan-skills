@@ -23,6 +23,10 @@ Use when publishing, managing, or converting cloud-native geospatial data catalo
 
 Guide users through querying and exploring Portolan/STAC catalogs with optimized GeoParquet and COGs
 
+### `portolan-migrate`
+
+Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it — audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
+
 ### `portolan-thumbnails`
 
 Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with an optional basemap, frames every bbox to the browser card's 3:2 shape, and gates each image on an automated blank probe plus a visual review. Requires Node.js 18+.
@@ -54,7 +58,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-consume`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
+Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-consume`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
 ### Claude Code (Web / Cowork)
 
@@ -74,6 +78,8 @@ gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-cli --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-consume --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-migrate --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-thumbnails --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
