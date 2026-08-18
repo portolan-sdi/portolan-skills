@@ -134,6 +134,8 @@ Audit data from Parquet footer statistics rather than by reading rows. Nulls, mi
 
 Sort every collection into one bucket: already conformant, metadata only, documentation only, style only, thumbnail only, conversion required, data-quality problem, provenance or licence problem, or unresolved. Present the counts. That table is what tells the user whether this is an afternoon or a week.
 
+Before any conversion, run the `portolan-bootstrap` mirror-path assessment against representative upstream assets. Add its evidence and maintenance estimate to the migration checkpoint. Use a metadata-only mirror only when upstream data meets all applicable specification requirements. Otherwise, build a full mirror with conformant data copies.
+
 ## Check Whether the Toolchain Moved Before You Decide to Patch
 
 This is the highest-leverage step in the skill, and it is easy to skip.

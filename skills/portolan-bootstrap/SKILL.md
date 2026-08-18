@@ -118,6 +118,76 @@ curl -s "<WFS_URL>?service=WFS\
 
 Record findings per candidate as you go: what the dataset is, who publishes it, what each non-obvious column means and where that meaning came from, what stays opaque, and whether it duplicates another candidate.
 
+### Assess the Mirror Path
+
+Decide whether to build a metadata-only mirror or a full mirror before conversion.
+
+A metadata-only mirror is valid only when the upstream data is fully cloud-native and meets the applicable specification requirements. Assess its delivery against [Data Storage](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/portolan/core.md#data-storage).
+
+Otherwise, build a full mirror. Include spec-compliant copies of the data that the catalog publisher hosts and controls.
+
+Test representative assets at the server, package, and file layers. See [portolan-spec issue #164](https://github.com/portolan-sdi/portolan-spec/issues/164) for case evidence. Keep its measurements out of permanent guidance.
+
+Send a ranged GET with a browser origin:
+
+```bash
+curl -sS -D range-headers.txt -o range.bin \
+  -H 'Range: bytes=0-16383' \
+  -H 'Origin: https://example.org' \
+  "$ASSET_URL"
+wc -c range.bin
+```
+
+Check the HTTP version, status, `Accept-Ranges`, `Content-Range`, total size, and transferred byte count. Check for transformations that break range semantics.
+
+Send a normal HEAD request. Compare its `Content-Length` with the total size from `Content-Range`:
+
+```bash
+curl -sS -I "$ASSET_URL"
+```
+
+Do not use a ranged HEAD request as proof of ranged GET behavior.
+
+Probe the browser preflight policy:
+
+```bash
+curl -sS -D cors-headers.txt -o /dev/null -X OPTIONS \
+  -H 'Origin: https://example.org' \
+  -H 'Access-Control-Request-Method: GET' \
+  -H 'Access-Control-Request-Headers: Range,If-Match,If-Modified-Since,If-None-Match,If-Unmodified-Since' \
+  "$ASSET_URL"
+```
+
+Compare the allowed origin, methods, request headers, and exposed response headers with the current Data Storage requirements.
+
+For an archive, inspect each member's method:
+
+```bash
+unzip -v source.zip
+```
+
+Distinguish bare files, stored members, and compressed members. A compressed member blocks selective reads of its inner file.
+
+Inspect the file layout too. For GeoTIFF, use GDAL against the remote asset:
+
+```bash
+gdalinfo --config GDAL_DISABLE_READDIR_ON_OPEN EMPTY_DIR \
+  "/vsicurl/$ASSET_URL"
+```
+
+Check tile blocks, overviews, IFD placement, `LAYOUT=COG`, and structural warnings. Use a TIFF structure inspector when exact offsets matter.
+
+Record observed values in a table. Put size, time, and maintenance estimates in a separate table.
+
+Choose one mirror type:
+
+* Use a metadata-only mirror only when the upstream data and delivery meet all applicable specification requirements.
+* Use a full mirror when the upstream server, package, or file layout fails any applicable requirement.
+
+A full mirror includes spec-compliant data copies. Estimate recurring checks, refreshes, storage, transfer, conversion, and catalog updates.
+
+When a small upstream change removes hosted copies, offer an optional `upstream-gaps.md` report. Do not block publication on that report.
+
 ### Checkpoint: Research Findings
 
 Present this before extracting anything:
@@ -127,6 +197,8 @@ Present this before extracting anything:
 * Columns that remain opaque after research.
 * Proposed license and attribution, with the page you found them on.
 * Estimated feature counts, total size, and time.
+* The selected mirror path, probe evidence, and expected maintenance cost.
+* The optional `upstream-gaps.md` offer, when a small change can enable direct access.
 
 Ask whether to proceed with this candidate set.
 
