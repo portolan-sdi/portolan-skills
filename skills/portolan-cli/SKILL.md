@@ -48,7 +48,7 @@ project/
     └── thumbnail.png            # Preview image
 ```
 
-**Single-file collections** (one GeoParquet/COG) use collection-level assets directly — no item directory needed.
+**Single-file collections** (one GeoParquet or one COG) use collection-level assets directly. They need no item directory. For multi-scene raster collections, follow the raster layout in the `portolan-bootstrap` skill.
 
 **Partitioned collections** (>2GB) use item subdirectories per partition.
 
