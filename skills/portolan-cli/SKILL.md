@@ -3,6 +3,8 @@ name: portolan-cli
 description: Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
 ---
 
+<!-- freshness: last-verified: 2026-08-28, maps-to: portolan-sdi/portolan-cli -->
+
 # Portolan CLI
 
 Publish and manage cloud-native geospatial data catalogs.
@@ -52,7 +54,7 @@ project/
 
 **Partitioned collections** (>2GB) use item subdirectories per partition.
 
-All STAC links use relative paths (`SELF_CONTAINED`) — catalogs are portable across hosting locations.
+The CLI writes relative structural links (`SELF_CONTAINED`), which keeps a catalog portable across hosting locations. This is CLI behavior, not a spec requirement. Spec v0.2.0 retired `PORTO-CORE-034` and takes no position on relative versus absolute links. It recommends an absolute `self` link on the root catalog of a catalog served from a single fixed URL (`PORTO-CORE-081`), which the CLI does not write.
 
 ## CLI Commands
 
