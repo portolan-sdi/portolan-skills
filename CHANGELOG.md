@@ -3,6 +3,41 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.2.1 - 2026-08-28
+
+The skills now track Portolan specification v0.2.0 and rashid 0.1.8.
+
+### Changed
+
+- Link guidance follows spec v0.2.0. The specification retired
+  `PORTO-CORE-034`, which had required every structural link to be relative and
+  had forbidden a `self` link. It added `PORTO-CORE-081`, a SHOULD for an
+  absolute `self` link on the root catalog of a catalog served from a single
+  fixed URL. `git-backed-catalog`, `portolan-migrate`, and `portolan-cli` said
+  Portolan forbids a `self` link. They no longer do.
+- `git-backed-catalog` gains a "Links and the Publish Step" section. It keeps
+  structural links relative in the tracked tree. It tells the agent to add a
+  publish-step rewrite for the absolute `self` link. The current template does
+  not supply that rewrite. The section also names the trap: a validator cannot
+  resolve an absolute structural link without a root `self` link, and reports
+  nothing for it.
+- `git-backed-catalog` asks for `rashid>=0.1.8,<0.2.0` rather than
+  `rashid==0.1.6`. Releases 0.1.5 through 0.1.7 report an error for a `self`
+  link and for an absolute structural `href`, both of which spec v0.2.0 allows.
+- `git-backed-catalog` and `portolan-migrate` described a conformance gate that
+  prints `SKIP: rashid is not installed` and exits 0. The catalog template fails
+  instead, both when rashid is absent and when its version falls outside the
+  required range.
+- The `portolan-migrate` reference tools stamp
+  `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json`.
+  `apply_metadata.py` carried v0.1.1 and `build_collection.py` carried v0.1.0,
+  which is the root-versus-child mismatch the skill itself warns about.
+- `portolan-migrate` reference `conformance.md` cited `PTL-LNK-005`, which
+  rashid removed in 0.1.8.
+- `portolan-cli` states the relative-link behavior as CLI behavior rather than
+  as a specification rule. It records that v1.0.0a0 `init` writes a relative
+  root `self` link. The file also gains a release-specific freshness marker.
+
 ## 0.2.0 - 2026-08-20
 
 This release adds eight skills. The plugin now covers the whole catalog

@@ -3,7 +3,7 @@ name: portolan-migrate
 description: Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it — audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
 ---
 
-<!-- freshness: last-verified: 2026-08-15, maps-to: portolan-sdi/portolan-spec specs/best-practices/
+<!-- freshness: last-verified: 2026-08-28, maps-to: portolan-sdi/portolan-spec specs/best-practices/
      Defects and counts come from two migrations run in August 2026:
      pergamino-ide-catalog (183 collections, WFS/GeoServer) and
      microsoft-ml-road-detections (one collection, 235 partitions, 12 GB). -->
@@ -160,14 +160,14 @@ Present the version delta, the sample diff, an estimated runtime for a full re-e
 
 `portolan check` runs rashid and reports `PTL-*` rule ids citing the spec requirements they enforce. Where the spec, the CLI, `stac-check`, or your own reading disagrees with rashid, rashid decides. Do not weaken it, suppress findings, or add an allow-list entry to obtain a clean run.
 
-### Pin the Version
+### Check the Version
 
-The catalog template's conformance gate resolves the validator with `shutil.which("rashid")`, so it uses whatever is on `PATH`. Two ways that bites:
+The catalog template's conformance gate resolves the validator with `shutil.which("rashid")`, so it uses whatever is on `PATH`. The gate fails when rashid is absent and when the version falls outside the range it requires, and the failure names the install command. Two ways the version still bites:
 
-* **No rashid on `PATH` and the gate skips.** It prints `SKIP: rashid is not installed; conformance not checked here` and exits 0. A green CI run can mean the validator never ran.
 * **A stale rashid under-reports.** Both migrations hit 0.1.4, which lacks `PTL-LNK-007`, `PTL-LNK-008`, `PTL-LNK-009`, and `PTL-AST-006`. The CLI's floor is 0.1.5 because 0.1.4's missing `PTL-AST-006` let a wrong COG media type mask `PTL-COL-004` and `PTL-MIR-001`.
+* **A rashid below 0.1.8 rejects a conforming v0.2.0 catalog.** Spec v0.2.0 retired `PORTO-CORE-034`, and rashid 0.1.8 dropped the two rules that carried it, `PTL-LNK-004` and `PTL-LNK-005`. Releases 0.1.5 through 0.1.7 still report an error for a `self` link and for an absolute structural `href`.
 
-Install the pinned version into a repository virtualenv and pin the same version in CI. Then check which one you are invoking. `portolan check` uses the CLI's own pinned rashid, while a bare `rashid check` uses whatever is on `PATH`. The two are routinely different versions on the same machine.
+Install `rashid>=0.1.8,<0.2.0` into a repository virtualenv and use the same range in CI. Then check which one you are invoking. `portolan check` uses the CLI's own rashid, while a bare `rashid check` uses whatever is on `PATH`. The two are routinely different versions on the same machine.
 
 One of those baselines is worth knowing about. Re-running with the newer validator produced an identical error count, and the identity was the finding: the data-pass rules were dormant, not passing.
 
@@ -215,7 +215,7 @@ Every Portolan Collection fails it:
 
 ```
 'list' object has no attribute 'get'
-[Schema: https://schemas.portolan-sdi.org/portolan/v0.1.1/schema.json]
+[Schema: https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json]
 ```
 
 The Portolan profile schema declares draft-07, where `items` may be an array of schemas, and its `valid_bbox` definition uses that form twice, once for a four-element bbox and once for six. stac-validator ignores the declared draft and pushes every schema through `Draft202012Validator`, where `items` must be a single schema. `referencing` then calls `.get("$id")` on the list and raises. Only a Collection reaches `valid_bbox`, which is why `catalog.json` passes and `collection.json` does not.
@@ -224,7 +224,7 @@ The spec's own reference catalog fails identically, so no change to your catalog
 
 Tolerate that one error string, narrowly: only when the failing schema is the Portolan one, and only after the document independently validates against that schema. Print the skipped count on every run so the exemption cannot quietly outlive the bug. Tracked as [portolan-spec#157](https://github.com/portolan-sdi/portolan-spec/issues/157).
 
-`stac-check` also recommends a `rel: self` link, which Portolan forbids so a static catalog can be mirrored or moved. Where the two disagree, rashid wins.
+`stac-check` also recommends a `rel: self` link. Portolan recommends one too since spec v0.2.0, on the root catalog of a catalog served from a single fixed URL (`PORTO-CORE-081`). Where the two tools disagree, rashid wins.
 
 ## Styles Are Where the Value Is
 
@@ -349,7 +349,7 @@ until grep -q 'DONE exit=' extract.log; do sleep 20; done
 
 Assume nothing survives. `license` and `providers` are overwritten outright whenever the merged metadata carries them, and `init` seeds both at the root, so the root's values reach every collection. `description` survives only where the merged metadata is blank, and `id` survives only because the existing file is reloaded first. The `SMART` merge strategy applies to assets and items, not to collection identity fields.
 
-The schema URI is not hardcoded either. The CLI stamps the highest version bundled by the rashid wheel it has installed, so the version you get tracks a dependency rather than the spec release you are targeting.
+The schema URI is not hardcoded either. The CLI stamps the highest version bundled by the rashid wheel it has installed, so the version you get tracks a dependency rather than the spec release you are targeting. A CLI running rashid 0.1.8 stamps v0.2.0.
 
 Keep authored metadata in a generator and re-apply it as an idempotent last pass after **every** `add`. See `reference/tools/apply_metadata.py`. Add a CI gate that regenerates and diffs, so a hand-edit to generated output fails the build rather than surviving until the next regeneration wipes it.
 

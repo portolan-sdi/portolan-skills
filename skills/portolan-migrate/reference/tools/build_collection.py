@@ -71,7 +71,7 @@ TEMPORAL_INTERVAL = [["<YYYY-MM-DDT00:00:00Z>", None]]
 
 # The profile schema version the current spec release defines. Every object in
 # the tree, root included, must declare the same one.
-PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.1.0/schema.json"
+PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
 
 # The glob is s3://, not https://, and that is deliberate. Expanding a glob
 # needs a listing, which plain HTTP does not provide: an https glob is sent

@@ -27,7 +27,7 @@ META = json.load(open(sys.argv[2], encoding="utf-8"))
 
 # The profile schema version the current spec release defines. Every object in
 # the tree, root included, must declare the same one.
-SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.1.1/schema.json"
+SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
 
 ROOT_ID = "<catalog-id>"
 ROOT_TITLE = "<Catalog Title>"

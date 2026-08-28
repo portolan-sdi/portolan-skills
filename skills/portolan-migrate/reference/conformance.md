@@ -58,10 +58,11 @@ staged partitions, so the guarantee comes from somewhere. It currently reports
 
 `tests/test_stac_valid.py` runs stac-check, which answers a different question:
 is this valid STAC, rather than does it conform to Portolan. It is advisory, and
-two of its best-practice notes are ignored on purpose. It wants a `rel: "self"`
-link, which `PTL-LNK-005` forbids so a static catalog can be mirrored or moved,
-and it wants a title on every link, which is only required on `child` and
-`item`.
+one of its best-practice notes is ignored on purpose. It wants a title on every
+link, which Portolan requires only on `child` and `item`. Its `rel: "self"`
+recommendation is no longer a disagreement. Spec v0.2.0 retired
+`PORTO-CORE-034`, rashid 0.1.8 dropped `PTL-LNK-005`, and `PORTO-CORE-081`
+recommends an absolute `self` link on the root catalog of a published catalog.
 
 One crash is tolerated, and only one.
 

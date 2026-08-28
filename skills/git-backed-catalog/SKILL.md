@@ -3,7 +3,7 @@ name: git-backed-catalog
 description: Create, maintain, or contribute to a Portolan catalog whose metadata lives in a git repository, with CI validating every change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
 ---
 
-<!-- freshness: last-verified: 2026-08-12, maps-to: portolan-sdi/portolan-catalog-template -->
+<!-- freshness: last-verified: 2026-08-28, maps-to: portolan-sdi/portolan-catalog-template -->
 
 # Git-Backed Portolan Catalogs
 
@@ -81,21 +81,38 @@ python3 tests/run_all.py
 python3 tools/publish.py            # dry run; uploads nothing
 ```
 
-### Pin `rashid` in a Repository Virtualenv
+### Give `rashid` a Version Floor in a Repository Virtualenv
 
-`tests/test_conformance.py` resolves the validator with `shutil.which("rashid")` and prints `SKIP: rashid is not installed` when it finds nothing. It therefore checks against whatever version happens to be on PATH, while CI installs a pinned one. Both migrations in August 2026 ran locally against a stale 0.1.4, which has no `PTL-LNK-007`, `PTL-LNK-008`, `PTL-LNK-009`, or `PTL-AST-006`, so the local gate passed a catalog the CI gate rejects.
+`tests/test_conformance.py` resolves the validator with `shutil.which("rashid")`. It fails when rashid is absent, and it fails when `rashid --version` falls outside the range the gate requires. The failure names the install command. Do not read a green run as proof that a validator read the catalog until you have seen the version the gate reports.
 
-Install the pinned version into a repository virtualenv and pin the same version in `.github/workflows/ci.yml`:
+The gate still checks whatever version sits on `PATH`, while CI installs its own. Both migrations in August 2026 ran locally against a stale 0.1.4, which has no `PTL-LNK-007`, `PTL-LNK-008`, `PTL-LNK-009`, or `PTL-AST-006`, so the local gate passed a catalog the CI gate rejects.
+
+Install the same range into a repository virtualenv and use it in `.github/workflows/ci.yml`:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install 'rashid==0.1.6' stac-check
+.venv/bin/pip install \
+  'rashid>=0.1.8,<0.2.0' stac-check
 .venv/bin/rashid --version
 ```
+
+The floor is 0.1.8 because that release is the first to carry the spec v0.2.0 rules. Releases 0.1.5 through 0.1.7 report an error for a `self` link and for an absolute structural `href`. Version 0.2.0 of the spec allows both. Use a floor rather than a pin. A pin goes stale on the next release, and every repository made from the template inherits it.
 
 Then run the gates through that interpreter, so the version the tests find is the version you chose.
 
 If the user is outside the `portolan-sdi` organization, follow `SETUP.md` step 10 and remove `.github/workflows/repo-checks.yml` and the `ops-sync` blocks. Those enforce that organization's contribution contract.
+
+### Links and the Publish Step
+
+Portolan takes no position on relative versus absolute structural links. Spec v0.2.0 retired `PORTO-CORE-034`, which had required every structural link to be relative and forbidden a `self` link on any object. A git-backed workflow still wants both properties, and it gets them by splitting the decision between the tree and the publish step.
+
+Keep structural links relative in the repository. The same JSON has to be valid in the repository, in whatever preview a pull request builds, and in production. Relative links give all three from one tree of bytes.
+
+Leave the `self` link out of the tracked tree. A tracked file whose correct content depends on the deployment target produces diff noise, and it conflicts on merge or rebase for reasons unrelated to the change under review. Have the publish step write the absolute `self` link onto the root catalog as it uploads. The `public_base` key in `catalog.publish.yaml` already holds the URL the step needs. The template publisher at `1351a3e` does not perform this rewrite. Add the rewrite before the first publication that relies on `PORTO-CORE-081`.
+
+Asset hrefs take their own decision. A client that reads one object in isolation has no base to resolve a relative href against. The Source Cooperative file listing renders asset hrefs as download links, and only absolute ones resolve there. The publish step can rewrite asset hrefs from the same `public_base`, or the tracked tree can carry absolute asset hrefs where the data already has a stable home.
+
+Absolute structural links carry one trap. A validator resolves an absolute structural link through the base that the root `self` link names. A catalog with absolute structural links and no root `self` link gives the validator no base, so the validator reports nothing for those links. The requirement that every link resolve still holds. The check disappears in silence. Keep a root `self` link if you want it.
 
 ### Adding a collection
 
@@ -141,7 +158,7 @@ Six things matter when maintaining an existing catalog:
 * **Edit the generator, not generated output.** If the repository has a `tools/` or `scripts/` pipeline, find the source of the generated catalog before editing `catalog/` directly.
 * **Do not widen the conformance allow-list to make CI pass.** If `tests/test_conformance.py` has an `ACCEPTED` set, adding a finding to it hides a real problem. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing does not contain `Content-Type`, so normal change detection may not notice the change.
-* **`stac-check` is advisory; `rashid` is the Portolan gate.** Some `stac-check` recommendations intentionally differ from Portolan. For example, it recommends a `self` link, which Portolan forbids because a static catalog may be mirrored or moved. Do not add a `self` link just to silence the warning.
+* **`stac-check` is advisory; `rashid` is the Portolan gate.** Where a `stac-check` recommendation differs from Portolan, rashid wins. The `self` link is no longer one of those cases. Portolan retired `PORTO-CORE-034` in spec v0.2.0 and now recommends an absolute `self` link on the root catalog of a published catalog (`PORTO-CORE-081`). Keep the link out of the tracked tree. Add a publish-step rewrite because the current template does not supply one. See [Links and the Publish Step](#links-and-the-publish-step).
 
 ## Mode C — Contribute to someone else's catalog
 
