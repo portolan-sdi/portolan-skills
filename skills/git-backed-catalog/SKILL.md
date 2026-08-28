@@ -108,7 +108,7 @@ Portolan takes no position on relative versus absolute structural links. Spec v0
 
 Keep structural links relative in the repository. The same JSON has to be valid in the repository, in whatever preview a pull request builds, and in production. Relative links give all three from one tree of bytes.
 
-Leave the `self` link out of the tracked tree. A tracked file whose correct content depends on the deployment target produces diff noise, and it conflicts on merge or rebase for reasons unrelated to the change under review. Have the publish step write the absolute `self` link onto the root catalog as it uploads. The `public_base` key in `catalog.publish.yaml` already holds the URL the step needs.
+Leave the `self` link out of the tracked tree. A tracked file whose correct content depends on the deployment target produces diff noise, and it conflicts on merge or rebase for reasons unrelated to the change under review. Have the publish step write the absolute `self` link onto the root catalog as it uploads. The `public_base` key in `catalog.publish.yaml` already holds the URL the step needs. The template publisher at `1351a3e` does not perform this rewrite. Add the rewrite before the first publication that relies on `PORTO-CORE-081`.
 
 Asset hrefs take their own decision. A client that reads one object in isolation has no base to resolve a relative href against. The Source Cooperative file listing renders asset hrefs as download links, and only absolute ones resolve there. The publish step can rewrite asset hrefs from the same `public_base`, or the tracked tree can carry absolute asset hrefs where the data already has a stable home.
 
@@ -158,7 +158,7 @@ Six things matter when maintaining an existing catalog:
 * **Edit the generator, not generated output.** If the repository has a `tools/` or `scripts/` pipeline, find the source of the generated catalog before editing `catalog/` directly.
 * **Do not widen the conformance allow-list to make CI pass.** If `tests/test_conformance.py` has an `ACCEPTED` set, adding a finding to it hides a real problem. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing does not contain `Content-Type`, so normal change detection may not notice the change.
-* **`stac-check` is advisory; `rashid` is the Portolan gate.** Where a `stac-check` recommendation differs from Portolan, rashid wins. The `self` link is no longer one of those cases. Portolan retired `PORTO-CORE-034` in spec v0.2.0 and now recommends an absolute `self` link on the root catalog of a published catalog (`PORTO-CORE-081`). The tracked tree still omits it, because the publish step writes it. See [Links and the Publish Step](#links-and-the-publish-step).
+* **`stac-check` is advisory; `rashid` is the Portolan gate.** Where a `stac-check` recommendation differs from Portolan, rashid wins. The `self` link is no longer one of those cases. Portolan retired `PORTO-CORE-034` in spec v0.2.0 and now recommends an absolute `self` link on the root catalog of a published catalog (`PORTO-CORE-081`). Keep the link out of the tracked tree. Add a publish-step rewrite because the current template does not supply one. See [Links and the Publish Step](#links-and-the-publish-step).
 
 ## Mode C — Contribute to someone else's catalog
 

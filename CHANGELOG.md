@@ -16,10 +16,11 @@ The skills now track Portolan specification v0.2.0 and rashid 0.1.8.
   fixed URL. `git-backed-catalog`, `portolan-migrate`, and `portolan-cli` said
   Portolan forbids a `self` link. They no longer do.
 - `git-backed-catalog` gains a "Links and the Publish Step" section. It keeps
-  structural links relative in the tracked tree and has the publish step write
-  the absolute `self` link from `public_base`. It also names the trap: a
-  validator cannot resolve an absolute structural link without a root `self`
-  link, and reports nothing for it.
+  structural links relative in the tracked tree. It tells the agent to add a
+  publish-step rewrite for the absolute `self` link. The current template does
+  not supply that rewrite. The section also names the trap: a validator cannot
+  resolve an absolute structural link without a root `self` link, and reports
+  nothing for it.
 - `git-backed-catalog` asks for `rashid>=0.1.8,<0.2.0` rather than
   `rashid==0.1.6`. Releases 0.1.5 through 0.1.7 report an error for a `self`
   link and for an absolute structural `href`, both of which spec v0.2.0 allows.
@@ -34,7 +35,8 @@ The skills now track Portolan specification v0.2.0 and rashid 0.1.8.
 - `portolan-migrate` reference `conformance.md` cited `PTL-LNK-005`, which
   rashid removed in 0.1.8.
 - `portolan-cli` states the relative-link behavior as CLI behavior rather than
-  as a specification rule. The file also gains a freshness marker.
+  as a specification rule. It records that v1.0.0a0 `init` writes a relative
+  root `self` link. The file also gains a release-specific freshness marker.
 
 ## 0.2.0 - 2026-08-20
 
