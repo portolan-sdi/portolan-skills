@@ -27,6 +27,24 @@ The Portolan CLI is one way to get there, not the definition of done. Where a be
 
 Record what you ran in the collection's `AGENTS.md` so the next person can reproduce it. The [spec](https://github.com/portolan-sdi/portolan-spec) is the standard and the CLI implements it. Read [philosophy.md](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/philosophy.md) for what the standard is buying.
 
+## Raster Collections
+
+Use a collection-level asset for a collection that contains one raster file. Do not create an item directory for that case.
+
+Model each scene as an item when a collection contains multiple raster scenes. Put each COG in its item's subdirectory. Link every normative item JSON from `collection.json` with an `item` link. Keep `items.parquet` as a derived mirror with the `collection-mirror` role.
+
+```text
+pop-1975/
+  collection.json          # carries one `item` link per scene
+  items.parquet            # derived mirror, `collection-mirror` role
+  thumbnail.png
+  pop-1975-R5_C11/
+    pop-1975-R5_C11.json   # normative item
+    GHS_POP_…_R5_C11.tif   # item-level asset
+```
+
+The published `nlebovits/jrc-glofas` reference contains 271 `item` links. Its links use paths such as `./ID100_N80_W20/ID100_N80_W20.json` and type `application/geo+json`.
+
 ## Working Agreement
 
 **Checkpoint when uncertain.** Asking costs a minute. Guessing costs a republish.

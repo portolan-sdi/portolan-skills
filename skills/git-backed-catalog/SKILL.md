@@ -101,11 +101,22 @@ If the user is outside the `portolan-sdi` organization, follow `SETUP.md` step 1
 
 Data files do not belong in git. Build them, upload them to the bucket, and write STAC that references them by public URL. The `.gitignore` already blocks common data formats, so a stray `git add` of a Parquet file is refused.
 
-Large item collections should be generated rather than committed as thousands of files. Write a STAC-GeoParquet item index to the bucket and point `collection.json` at `items.parquet`, so clients read one index instead of thousands of item files.
+Generate large item collections instead of writing thousands of item files by hand. Publish the normative item JSON, with one subdirectory per item. An `items.parquet` asset with the `collection-mirror` role is a derived mirror. It never replaces the item JSON or the collection's `item` links.
 
-Fields of the World uses this approach for roughly 45,000 Sentinel-2 items.
+Decide separately whether to commit the generated item JSON to git. The GHSL mirror committed 11 MB of item JSON deliberately. Without those files, the local `rashid` check did not expose the missing published item tree.
+
+Fields of the World uses a STAC-GeoParquet mirror for roughly 45,000 Sentinel-2 items. This scale is not precedent for omitting normative item JSON.
 
 Once a collection exists, run the gates before committing. `test_links.py` catches a common mistake: adding a `child` link before the directory it points to exists.
+
+Add a two-way consistency gate for generated catalogs. Assert all of these conditions:
+
+* Every collection has a `child` link from its parent.
+* Every `child` link resolves.
+* The resolved collection count matches `portolan:collection_count`.
+* The root and every collection agree on providers.
+
+Verify that this gate fails on a real orphan before you trust it.
 
 ### Uploading Data That Lives Outside `catalog/`
 
@@ -138,10 +149,29 @@ Six things matter when maintaining an existing catalog:
 
 * **Publishing never deletes.** Removing a file from `catalog/` does not remove the object from the bucket. Delete the object separately if that is intended.
 * **Two publishers exist and they do not interoperate.** `portolan push` tracks what it has uploaded in `versions.json`, keyed on sha256. The template's `tools/publish.py` keeps no state and compares local size and MD5 against the remote listing's size and ETag. The `portolan-thumbnails` skill assumes the first, this skill assumes the second. Pick one per catalog and say which in the repository's own `AGENTS.md`.
+  This incompatibility covers only the publisher. Continue to use `portolan add` to build the catalog tree. It creates one item directory per item-level asset.
 * **Edit the generator, not generated output.** If the repository has a `tools/` or `scripts/` pipeline, find the source of the generated catalog before editing `catalog/` directly.
 * **Do not widen the conformance allow-list to make CI pass.** If `tests/test_conformance.py` has an `ACCEPTED` set, adding a finding to it hides a real problem. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing does not contain `Content-Type`, so normal change detection may not notice the change.
 * **`stac-check` is advisory; `rashid` is the Portolan gate.** Some `stac-check` recommendations intentionally differ from Portolan. For example, it recommends a `self` link, which Portolan forbids because a static catalog may be mirrored or moved. Do not add a `self` link just to silence the warning.
+
+### Measure Before You Add Workers
+
+Measure the workload before you change concurrency:
+
+| Workload | Bound | Measured evidence | Action |
+| --- | --- | --- | --- |
+| COG conversion | CPU | 99.9% CPU, 1.8% iowait, and load 26 on 16 cores | Do not add workers. |
+| Catalog publish | Latency | 238 ms round trip for 2.7 KB objects; serial upload took 23 minutes | Parallelize small-object uploads. Sixteen workers uploaded the remaining 1,786 files in 46 seconds. |
+| Government host download | Server-side cap | One, four, and eight streams each reached 4.5–6.6 MB/s | Do not assume local bandwidth sets throughput. |
+
+Measure iowait before you add conversion workers. Always parallelize small-object uploads.
+
+### Run the Live Storage Gate After Publish
+
+Run `rashid check --live` after bytes exist at the public prefix. This is the only gate for the Data Storage requirements. It checks Range support, `206` responses, CORS headers, and `Access-Control-Allow-Headers: Range`.
+
+The check cannot run against an empty prefix. Put it in the publish sequence after upload. Pass the catalog directory to `rashid check`, not the path to `catalog.json`.
 
 ## Mode C — Contribute to someone else's catalog
 
