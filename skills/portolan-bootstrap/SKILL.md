@@ -47,7 +47,7 @@ Read [philosophy.md](https://github.com/portolan-sdi/portolan-spec/blob/main/spe
 
 **Publish when you can defend it.** Every collection should answer the question "where did this sentence come from, and does that map show what the legend claims?"
 
-## Record the Source of Every Claim
+## Record the source of every claim
 
 Research widely. Then make each claim traceable. A fact belongs in the catalog when it fits one of three tiers.
 

@@ -47,7 +47,7 @@ That table is the deliverable for any data change. Without it you cannot tell a 
 
 ## Before You Touch Anything
 
-### Back Up Before You Change Anything
+### Back up before you change anything
 
 ```bash
 BK=~/backups/<catalog>-premigration-<YYYYMMDD>
@@ -186,7 +186,7 @@ Every catalog and collection MUST declare the versioned Portolan schema URI in `
 
 Take the version from the spec release you are targeting. The CLI stamps the highest schema version the installed rashid bundles, so what it writes tracks a dependency rather than your target. With portolan-cli 0.8.0 and rashid 0.1.8 that is v0.2.0, which matches spec v0.2.0. Pin the pair and check the stamped URI once. The reference generators keep the URI in a module constant so the choice is explicit.
 
-### rashid does not read partitions behind a remote glob
+### Remote globs hide partitions from rashid
 
 rashid 0.1.8 runs `PTL-DAT-006`, `PTL-DAT-007`, `PTL-DAT-008`, `PTL-DAT-012`, and `PTL-DAT-014` over every file a local relative `partition:glob` matches, and reports once per collection at `/partition:glob`. A remote or absolute glob (`s3://`, `https://`, `/data`) cannot be listed from the local tree, so rashid does not read those partitions. The run reports no error.
 
@@ -210,7 +210,7 @@ Every Portolan Collection fails it with `'list' object has no attribute 'get'`. 
 
 `stac-check` also recommends a `rel: self` link. The spec agrees for the root of a catalog served from one fixed URL, which SHOULD have an absolute `self` link (PORTO-CORE-081). Keep that link. rashid uses it as the base for resolving absolute structural links.
 
-## Old Styles Usually Need Replacing
+## Old styles usually need replacing
 
 An old catalog usually validates long before it communicates anything. One had 177 `styles/default.json` files containing **three distinct paint blocks** between them. Those blocks were a flat blue fill, a flat blue circle, and a flat blue line. No data-driven expressions at all. The source URL was a bare relative path with no `pmtiles://` prefix, so nothing loaded in MapLibre and every thumbnail came out monochrome.
 
@@ -226,7 +226,7 @@ Worse, a rule mixing equality with a range converts to something quietly wrong, 
 
 Those styles are frequently the publisher's most considered cartography. In one catalog 81 of 92 SLDs converted, and all 11 failures were choropleths. `reference/tools/sld_graduated.py` converts them to a `step` expression, which is also the form the browser can derive a legend from. Its output carries no source `url`. Run `reference/tools/fix_styles.py` after it, or the style will not load.
 
-### Defects No Validator Sees
+### Defects no validator sees
 
 rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
 
@@ -293,7 +293,7 @@ Publishing never deletes. Those 1,492 objects stay served, at their old URLs, al
 
 Guard the prune list. Any remote key that matches one of the new prefixes but is absent locally goes into a `refuse` bucket, never a `delete` one, because that pattern means your local tree is incomplete rather than that the object is stale. Prove every object you intend to delete is recoverable from the backup, dry-run the deletion, then batch it.
 
-### Traps Found Only After Publishing
+### Traps found only after publishing
 
 **`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. PORTO-FMT-020 exempts the glob from the https-only rule for exactly this reason. Enabling asterisks in HTTP paths does not rescue it. The glob never expands over plain HTTP. The single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
 
