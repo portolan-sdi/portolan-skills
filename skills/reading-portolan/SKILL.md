@@ -237,7 +237,7 @@ TO 'subset.geojson' WITH (FORMAT GDAL, DRIVER 'GeoJSON');
 
 For other formats use `ogr2ogr`. It reads remote files through `/vsicurl/https://...`, `/vsis3/bucket/...`, and `/vsigs/bucket/...`. `gpio inspect data.parquet` and `gpio inspect stats data.parquet` give a quick summary without SQL. `gpio check all data.parquet` reports whether a file follows the layout rules above.
 
-## Step 4: Partitioned collections
+## Step 4: partitioned collections
 
 A collection with `partition:glob` spreads its rows over several files. The glob is the bulk-access path (PORTO-FMT-019). Copy it as written. Do not build your own pattern from the asset hrefs, because the scheme decides the directory layout.
 
@@ -267,7 +267,7 @@ SELECT * FROM read_parquet(
 
 For `s3://`, set the region and, for a private bucket, the keys. Every partition file shares one schema (PORTO-FMT-021), so the glob queries as one table. When the partitions are also items, `items.parquet` or the item JSONs give each partition's bbox.
 
-## Step 5: Read rasters
+## Step 5: read rasters
 
 A single COG is a collection `data` asset. A multi-scene collection has one item per scene. Query `items.parquet` (role `collection-mirror`) with DuckDB to select scenes by bbox or datetime, then open the COG href from the chosen rows.
 
@@ -286,7 +286,7 @@ Read windows, not whole files. `rioxarray.open_rasterio(url)` is lazy. `da.isel(
 
 For conversion, `gdal_translate` and `gdalwarp` read the same `/vsicurl/` URLs as `ogr2ogr`. Point cloud support is not yet defined in the specification (PORTO-FMT-039). Do not promise COPC support.
 
-## Step 6: Visualize
+## Step 6: visualize
 
 Use MapLibre GL JS with the PMTiles protocol. Do not export GeoJSON or inline data for a web map. The collection already ships tiles built for the browser.
 

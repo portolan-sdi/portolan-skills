@@ -170,7 +170,7 @@ lines, or 200 points, step the zoom down one and try again, up to three times. A
 quantile trim on the same centroids, `quantile_cont(x, 0.05)` through
 `quantile_cont(x, 0.95)`, handles a scatter with one distant outlier.
 
-## Step 4: Render
+## Step 4: render
 
 ### Start the Server
 

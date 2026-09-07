@@ -112,7 +112,7 @@ gh issue create \
 
 The title names the catalog first, then the problem in a few words.
 
-## Step 5: Report back
+## Step 5: report back
 
 Give the user the issue URL. Tell them the registry mails the submitter of that catalog. Nothing about the catalog's registration or validity changes. Those come from the nightly crawl, not from feedback.
 

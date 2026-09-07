@@ -75,7 +75,7 @@ portolan info
 
 `init` writes `catalog.json`, `AGENTS.md`, and `README.md` beside each other, linked with `rel: agents` and `rel: describedby` (PORTO-CORE-005, PORTO-CORE-061, PORTO-CORE-062). It also writes `versions.json`. That file is a CLI artifact, not part of the spec.
 
-## Step 4: Add files
+## Step 4: add files
 
 Files must sit in collection subdirectories. Files at the catalog root are skipped.
 
@@ -87,7 +87,7 @@ portolan add .
 
 Add `--pmtiles` for vector collections so the catalog ships a render path (PORTO-CORE-065). The CLI writes the PMTiles as a `rel: pmtiles` link with a `pmtiles:layers` array (PORTO-FMT-011) and a default style asset under `styles/`.
 
-## Step 5: Write metadata
+## Step 5: write metadata
 
 `portolan metadata init` writes a `.portolan/metadata.yaml` template at every STAC level. `portolan metadata validate` requires `contact.name`, `contact.email`, and `license`. Nothing else is required by the CLI. The spec requires more.
 

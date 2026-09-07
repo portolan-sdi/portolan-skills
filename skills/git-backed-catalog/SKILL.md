@@ -19,7 +19,7 @@ See the [git-backed catalogs guidance](https://github.com/portolan-sdi/portolan-
 
 Pick the mode that matches what the user asked for.
 
-## Mode A: Create a new Git-backed catalog
+## Mode A: create a new git-backed catalog
 
 This path suits a catalog that takes contributions or needs rollback. If the user wants to convert a data source and publish it to a bucket, use the `portolan-bootstrap` skill instead.
 
@@ -93,7 +93,7 @@ Its change detection compares a multipart object by size alone. Pass `--force` a
 
 A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally, so the full check runs where the bytes are.
 
-## Mode B: Maintain an existing catalog
+## Mode B: maintain an existing catalog
 
 The loop is:
 
@@ -113,7 +113,7 @@ Six things matter:
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing carries no `Content-Type`, so change detection does not notice.
 * **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` at `ed23c3b` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 
-## Mode C: Contribute to someone else's catalog
+## Mode C: contribute to someone else's catalog
 
 You have a published `catalog.json` and want to correct something in it.
 
