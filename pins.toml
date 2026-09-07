@@ -1,0 +1,18 @@
+# Upstream versions the skills describe. scripts/check_drift.py reads this
+# file. Move a pin only together with the skill edits that track the change.
+
+[portolan-cli]
+# The PyPI release. `pip install portolan-cli` gives this version.
+version = "0.8.0"
+
+[rashid]
+version = "0.1.8"
+
+[portolan-spec]
+tag = "v0.2.0"
+
+[portolan-catalog-template]
+sha = "ed23c3b"
+
+[portolan-registry]
+sha = "9bcfcb2"

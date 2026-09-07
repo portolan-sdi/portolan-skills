@@ -1,16 +1,16 @@
 ---
 name: portolan-migrate
-description: Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it — audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
+description: Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
 ---
 
-<!-- freshness: last-verified: 2026-08-28, maps-to: portolan-sdi/portolan-spec specs/best-practices/
-     Defects and counts come from two migrations run in August 2026:
+<!-- drift: depends-on: portolan-cli, rashid, portolan-spec, portolan-catalog-template -->
+<!-- Defects and counts come from two migrations run in August 2026:
      pergamino-ide-catalog (183 collections, WFS/GeoServer) and
      microsoft-ml-road-detections (one collection, 235 partitions, 12 GB). -->
 
 # Portolan Migrate
 
-Something already exists. A catalog built by an older toolchain, a folder of GeoParquet with a README, a Source Cooperative product predating Portolan. It has users, download counts, and URLs other people have written down. Your job is to bring it into compliance without breaking any of that.
+Something already exists. A catalog built by an older toolchain, a folder of GeoParquet with a README, a Source Cooperative product that predates Portolan. It has users, download counts, and URLs other people have written down. Your job is to bring it into compliance without breaking any of that.
 
 Use `portolan-bootstrap` when there is no catalog yet and you are converting a data source. Use this skill when the artifact exists and must survive.
 
@@ -18,14 +18,14 @@ Use `portolan-bootstrap` when there is no catalog yet and you are converting a d
 
 The data is innocent until a named requirement proves otherwise. That single rule decides most of what follows.
 
-Do not re-download upstream, reconstruct from source, filter rows, rename meaningful fields, or change CRS, geometry, or partitioning because a rewrite would be tidier. When a rule forces a change, quantify it. Report before and after row count, file count, and size, say which rule forced it, and say whether it is reversible:
+Do not re-download upstream, reconstruct from source, filter rows, rename meaningful fields, or change CRS, geometry, or partitioning because a rewrite would be tidier. When a rule forces a change, quantify it. Report before and after row count, file count, and size. Say which rule forced it, and say whether it is reversible:
 
 ```
 files       235 -> 235
 rows        256,555,010 -> 256,555,010
 length      54,225,233 km -> 54,225,233 km
 row groups  376 -> 2,709
-max rg rows 3,593,665 -> 100,000   (PTL-DAT-008 caps at 150,000)
+max rg rows 3,593,665 -> 100,000   (PORTO-FMT-009 caps at 150,000)
 bytes       11,415,256,478 -> 11,999,057,592   (+5.11%)
 ```
 
@@ -39,7 +39,7 @@ That table is the deliverable for any data change. Without it you cannot tell a 
 
 **Measure, then write.** Every derived number in the documentation comes from a query you ran over the whole dataset, not a sample and not a plausible guess.
 
-**The old catalog is live.** Its defects are being served right now, and its stale objects will survive your push. Treat the remote as something to reconcile, not something that updates itself.
+**The old catalog is live.** Its defects are served right now, and its stale objects will survive your push. Treat the remote as something to reconcile, not something that updates itself.
 
 **Ask the publisher.** Licence, sensitivity, and exclusions are their call, not yours. Two of the three cost real rework when guessed.
 
@@ -114,10 +114,10 @@ Sampling hides the shape of the problem. Count. One catalog's audit, which is a 
 |---|---|---|
 | `title` | 1 of 178 | MUST |
 | `providers` | 0 of 178 | MUST |
-| Licence other than `proprietary` | 0 of 178 | `proprietary` MUST NOT be used |
+| Licence other than `proprietary` | 0 of 178 | `proprietary` MUST NOT be used (PORTO-CORE-060) |
 | `rel: describedby` | 0 of 178 | MUST |
 | `rel: agents` | 0 of 178 | MUST |
-| Portolan schema URI | 0 of 178 | MUST |
+| Portolan schema URI | 0 of 178 | MUST (PORTO-CORE-006) |
 | Style carrying the `default` role | 0 of 178, though 167 shipped two styles | MUST where more than one |
 | `AGENTS.md` on disk | 0 | MUST |
 | Populated temporal extent | 0 of 178 | |
@@ -156,75 +156,47 @@ Re-extraction can be cheaper than patching and strictly better in output. It can
 
 Present the version delta, the sample diff, an estimated runtime for a full re-extraction, and anything the old catalog holds that a re-extraction would destroy. Ask which path to take.
 
-## Rashid Is the Gate, and It Has a Hole You Must Plug
+## The spec is ground truth. rashid checks it
 
-`portolan check` runs rashid and reports `PTL-*` rule ids citing the spec requirements they enforce. Where the spec, the CLI, `stac-check`, or your own reading disagrees with rashid, rashid decides. Do not weaken it, suppress findings, or add an allow-list entry to obtain a clean run.
+[portolan-spec](https://github.com/portolan-sdi/portolan-spec) is the standard. Every requirement carries a `PORTO-CORE-NNN` or `PORTO-FMT-NNN` id in `specs/portolan/requirements.yaml`. rashid implements those requirements and reports `PTL-*` rule ids that cite them. `portolan check` runs rashid.
 
-### Check the Version
+Where rashid and the spec disagree, the spec decides. File the disagreement against rashid, cite the `PORTO` id, and record the workaround in `docs/conformance.md`. Do not weaken the validator, suppress findings, or add an allow-list entry to obtain a clean run. Where the CLI, `stac-check`, or your own reading disagrees with rashid and the spec is silent, rashid stands until the spec says otherwise.
 
-The catalog template's conformance gate resolves the validator with `shutil.which("rashid")`, so it uses whatever is on `PATH`. The gate fails when rashid is absent and when the version falls outside the range it requires, and the failure names the install command. Two ways the version still bites:
+### Pin the version
 
-* **A stale rashid under-reports.** Both migrations hit 0.1.4, which lacks `PTL-LNK-007`, `PTL-LNK-008`, `PTL-LNK-009`, and `PTL-AST-006`. The CLI's floor is 0.1.5 because 0.1.4's missing `PTL-AST-006` let a wrong COG media type mask `PTL-COL-004` and `PTL-MIR-001`.
-* **A rashid below 0.1.8 rejects a conforming v0.2.0 catalog.** Spec v0.2.0 retired `PORTO-CORE-034`, and rashid 0.1.8 dropped the two rules that carried it, `PTL-LNK-004` and `PTL-LNK-005`. Releases 0.1.5 through 0.1.7 still report an error for a `self` link and for an absolute structural `href`.
+The catalog template's `tests/test_conformance.py` runs whatever `rashid` is on `PATH`. It fails when rashid is absent or outside `>=0.1.5,<0.2.0`, and its `docs/conformance.md` says why. Install the pinned version into a repository virtualenv and pin the same version in CI.
 
-Install `rashid>=0.1.8,<0.2.0` into a repository virtualenv and use the same range in CI. Then check which one you are invoking. `portolan check` uses the CLI's own rashid, while a bare `rashid check` uses whatever is on `PATH`. The two are routinely different versions on the same machine.
-
-One of those baselines is worth knowing about. Re-running with the newer validator produced an identical error count, and the identity was the finding: the data-pass rules were dormant, not passing.
+Then check which one you are invoking. `portolan check` imports rashid from the CLI's own environment, while a bare `rashid check` uses whatever is on `PATH`. The two are routinely different versions on the same machine. Re-running with a newer validator and getting an identical error count is a finding, not a confirmation. It can mean the rules you care about never ran.
 
 ### Declare One Schema Version
 
-Rashid resolves the profile schema from the **root** catalog, then validates every object against it. A root declaring v0.1.0 with children declaring v0.1.1 therefore makes every child disagree with the schema it was checked against. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings of `PTL-CNF-002`, one per object. Set the version once, at the root, and make the per-collection pass match it.
+Every catalog and collection MUST declare the versioned Portolan schema URI in `stac_extensions` (PORTO-CORE-006). rashid reads the profile version from the **root** catalog and flags every object whose URI differs from it as `PTL-CNF-002`. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings, one per object. Set the version once, at the root, and make the per-collection pass match it.
 
-A released schema is immutable, so the version is a real choice rather than a formality. Take it from the spec release you are targeting, not from what the CLI happens to emit, and expect the two to differ during a migration. The reference generators keep it in a module constant for this reason.
+Take the version from the spec release you are targeting. The CLI stamps the highest schema version the installed rashid bundles, so what it writes tracks a dependency rather than your target. With portolan-cli 0.8.0 and rashid 0.1.8 that is v0.2.0, which matches spec v0.2.0. Pin the pair and check the stamped URI once. The reference generators keep the URI in a module constant so the choice is explicit.
 
-### The Partition Blind Spot
+### Partitions behind a remote glob go unchecked
 
-For a partitioned collection with no `data` asset, rashid's data checks iterate the node's declared assets, and there is no asset to iterate.
+rashid 0.1.8 runs `PTL-DAT-006`, `PTL-DAT-007`, `PTL-DAT-008`, `PTL-DAT-012`, and `PTL-DAT-014` over every file a local relative `partition:glob` matches, and reports once per collection at `/partition:glob`. A remote or absolute glob (`s3://`, `https://`, `/data`) cannot be listed from the local tree, so those partitions go unread and the run stays clean.
 
-| Check | Reaches glob-matched partitions? |
-|---|---|
-| `PTL-DAT-014` single schema | Yes, it runs outside the asset loop |
-| `PTL-DAT-006` spatial ordering | No |
-| `PTL-DAT-007` per-row-group statistics | No |
-| `PTL-DAT-008` row-group cap | No |
-| `PTL-DAT-012` GeoParquet version | No |
+A published partitioned collection uses exactly that layout. Its data assets carry absolute `https` hrefs and its glob uses a bucket-native scheme, which PORTO-FMT-020 permits because glob expansion needs a listing. So a clean local run before upload proves nothing about the partitions.
 
-Confirmed by planting a partition with a 1,176,571-row row group, 7.8 times over the 150,000 cap `PORTO-FMT-009` sets, and getting a clean run. `PORTO-FMT-022` steers exactly this layout, saying that for opaque partitioning schemes or hundreds of partitions the glob pattern is the access path rather than items, so the gap sits where the spec sends you. Tracked as [rashid#130](https://github.com/portolan-sdi/rashid/issues/130).
-
-Close it locally with a test asserting those four invariants directly against the staged partitions, and remove that test only once rashid covers the same ground.
+Build a throwaway tree that mirrors the published layout, with hrefs rewritten to relative paths and the glob rewritten to a local relative pattern. Symlink the partitions rather than copy them, then run the data pass against that tree. Checksums still match, because the symlinks point at the same files the generator measured. See `reference/tools/validate_with_data.py`.
 
 ### Run a Negative Control
 
-Build a deliberately broken copy of the catalog, run the validator, and confirm it fails. Do this before you trust any clean run, not after. It is the cheapest step in this skill and it is the one that found the blind spot above.
-
-### The Data Pass Needs Local Bytes
-
-Once the catalog addresses its data with absolute https hrefs and an absolute `partition:glob`, none of that resolves until after upload, and a local-scope data pass skips it in silence. A clean local run then proves nothing.
-
-Build a throwaway tree mirroring the published layout, with hrefs rewritten to relative paths and partitions symlinked rather than copied, and run the data pass against that. Checksums still match, because the symlinks point at the same files the generator measured. See `reference/tools/validate_with_data.py`.
+Build a deliberately broken copy of the catalog, run the validator, and confirm it fails. Do this before you trust any clean run, not after. Plant a partition with a row group over the 150,000-row cap (PORTO-FMT-009) and confirm `PTL-DAT-008` fires at `/partition:glob`. It is the cheapest step in this skill.
 
 ### Never Widen the Allow-List
 
-Keep a `docs/conformance.md` whose accepted-deviation list starts empty. A rule id enters the gate's `ACCEPTED` set only alongside a row in that file naming what was accepted, where, why, and the issue tracking it. Both or neither. A silently widened allow-list is a false claim about what the catalog conforms to.
+The template ships `docs/conformance.md` and an `ACCEPTED` set in `tests/test_conformance.py` that starts empty. A rule id enters `ACCEPTED` only alongside a row in that file naming what was accepted, where, why, and the issue tracking it. Both or neither. A silently widened allow-list is a false claim about what the catalog conforms to.
 
-`reference/conformance.md` is a template with both known upstream defects already written up.
+`reference/conformance.md` carries the one section a migrated catalog adds to the template's file.
 
 ### `stac-check` Is Advisory, and Currently Crashes
 
-Every Portolan Collection fails it:
+Every Portolan Collection fails it with `'list' object has no attribute 'get'`. That is a stac-validator defect, tracked as [portolan-spec#157](https://github.com/portolan-sdi/portolan-spec/issues/157), and the template's `tests/test_stac_valid.py` and `docs/conformance.md` already tolerate that one string narrowly. The spec's own reference catalog fails identically, so no change to your catalog avoids it. Diagnosing it from scratch cost eleven turns in one session and six in the other. Do not re-diagnose it.
 
-```
-'list' object has no attribute 'get'
-[Schema: https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json]
-```
-
-The Portolan profile schema declares draft-07, where `items` may be an array of schemas, and its `valid_bbox` definition uses that form twice, once for a four-element bbox and once for six. stac-validator ignores the declared draft and pushes every schema through `Draft202012Validator`, where `items` must be a single schema. `referencing` then calls `.get("$id")` on the list and raises. Only a Collection reaches `valid_bbox`, which is why `catalog.json` passes and `collection.json` does not.
-
-The spec's own reference catalog fails identically, so no change to your catalog avoids it. Diagnosing this from scratch cost eleven turns in one session and six in the other.
-
-Tolerate that one error string, narrowly: only when the failing schema is the Portolan one, and only after the document independently validates against that schema. Print the skipped count on every run so the exemption cannot quietly outlive the bug. Tracked as [portolan-spec#157](https://github.com/portolan-sdi/portolan-spec/issues/157).
-
-`stac-check` also recommends a `rel: self` link. Portolan recommends one too since spec v0.2.0, on the root catalog of a catalog served from a single fixed URL (`PORTO-CORE-081`). Where the two tools disagree, rashid wins.
+`stac-check` also recommends a `rel: self` link. The spec agrees for the root of a catalog served from one fixed URL, which SHOULD carry an absolute `self` link (PORTO-CORE-081). Keep that link. rashid uses it as the base for resolving absolute structural links.
 
 ## Styles Are Where the Value Is
 
@@ -240,11 +212,11 @@ Two conversion limits to expect. The CLI's SLD converter handles categorical rul
 
 Worse, a rule mixing equality with a range converts to something quietly wrong, because the filter search descends through the enclosing `And` and finds the equality alone.
 
-Those styles are frequently the publisher's most considered cartography. In one catalog 81 of 92 SLDs converted, and all 11 failures were choropleths. `reference/tools/sld_graduated.py` converts them to a `step` expression, which is also the form the browser can derive a legend from.
+Those styles are frequently the publisher's most considered cartography. In one catalog 81 of 92 SLDs converted, and all 11 failures were choropleths. `reference/tools/sld_graduated.py` converts them to a `step` expression, which is also the form the browser can derive a legend from. Its output carries no source `url`. Run `reference/tools/fix_styles.py` after it, or the style will not load.
 
 ### Four Defects No Validator Sees
 
-Rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
+rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
 
 * `fill-opacity: 0.0`, which is invisible and valid.
 * `circle-color: #ffffff` against a white background.
@@ -259,7 +231,7 @@ Three separate rounds of invented figures reached draft documentation in one ses
 
 Every derived number ships only after you compute it over the whole dataset. Two traps make wrong numbers easy:
 
-**DuckDB `ST_Length_Spheroid` returns silently wrong finite values**, not just `NaN`, and was still wrong in 1.5.5. Cross-checked against a hand-written Vincenty inverse, a haversine implementation over raw WKB agreed to 0.2 percent while DuckDB disagreed erratically in both directions. `ST_Union_Agg` also segfaults on large geometries; use the bbox covering column instead.
+**DuckDB `ST_Length_Spheroid` returns silently wrong finite values**, not just `NaN`, and was still wrong in 1.5.5. Cross-checked against a hand-written Vincenty inverse, a haversine implementation over raw WKB agreed to 0.2 percent while DuckDB disagreed erratically in both directions. `ST_Union_Agg` also segfaults on large geometries. Use the bbox covering column instead.
 
 **Measure spatial ordering against each file's own extent.** One session spent seven turns concluding a catalog had no spatial ordering anywhere, then found the opposite: 170 of 179 files were Hilbert-ordered and none were unordered. The first measurement scored every file against one catalog-wide envelope, and a file sorted on its own extent traces a different curve, so it reads as random under someone else's. Run an explicitly sorted control to calibrate the threshold before believing either answer.
 
@@ -305,11 +277,7 @@ Guard the prune list. Any remote key that matches one of the new prefixes but is
 
 ### Four Traps Found Only After Publishing
 
-**`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. `PORTO-FMT-020` exempts the glob from the https-only rule for exactly this reason:
-
-> The https-only rule for absolute asset hrefs does not extend to the glob: globs are consumed by partition-aware readers rather than browsers, and bucket-native schemes (`s3://`, `gs://`) MAY be used where those readers need them (glob expansion requires listing, which plain https does not provide).
-
-Enabling asterisks in HTTP paths does not rescue it. An https glob cannot work at all. Note the single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
+**`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. PORTO-FMT-020 exempts the glob from the https-only rule for exactly this reason. Enabling asterisks in HTTP paths does not rescue it. An https glob cannot work at all. The single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
 
 **A bucket name containing dots needs path-style addressing.** Virtual-host addressing fails TLS verification. The documented setup has to say so, along with the endpoint, or the reader's first query fails.
 
@@ -334,24 +302,21 @@ Both migrations ran the repository path: a catalog repo created from `portolan-s
 **A turn interrupt kills a foreground background job.** One extraction died at 84 of 187 layers while reporting exit 0. Detach long runs and poll a log for a completion sentinel:
 
 ```bash
-setsid nohup ./run-extract.sh > /dev/null 2>&1 < /dev/null &
-disown
+nohup ./run-extract.sh > /dev/null 2>&1 < /dev/null &
 until grep -q 'DONE exit=' extract.log; do sleep 20; done
 ```
 
 **Exit code 0 can mean "aborted at a confirmation prompt."** Pipe `yes |` into anything that prompts, or you will read a successful exit from a command that did nothing.
 
-**Deferring thumbnails leaves a rule firing.** Migration often stages thumbnails separately, through `portolan-thumbnails`, so `portolan add --no-thumbnails` is the common call. That leaves `PTL-VIZ-001` failing until the images land. Expect it in the interim baseline rather than chasing it, and pair `--no-thumbnails` with `check.disabled` in `.portolan/config.yaml` only for a catalog that will never ship thumbnails at all.
+**Deferring thumbnails leaves a rule firing.** Migration often stages thumbnails separately, through `portolan-thumbnails`, so `portolan add --no-thumbnails` is the common call. That leaves `PTL-VIZ-001` failing until the images land. Expect it in the interim baseline rather than chasing it. Pair `--no-thumbnails` with `check.disabled` in `.portolan/config.yaml` only for a catalog that will never ship thumbnails at all.
 
-### Generated Metadata Overwrites Authored Metadata
+### Apply what add cannot derive
 
-`portolan add` regenerates `collection.json` through hierarchical metadata resolution. In one migration that clobbered every collection's `title` with the catalog root's title, and reverted the `stac_extensions` schema URI.
+`portolan add` regenerates `collection.json`. Since portolan-cli 0.8.0 a collection's own `metadata.yaml` is authoritative for its title, description, license, and providers, and an ancestor's `metadata.yaml` only fills a field the collection still lacks. A re-add no longer replaces a title a maintainer set on the collection, and a catalog title never becomes a collection title.
 
-Assume nothing survives. `license` and `providers` are overwritten outright whenever the merged metadata carries them, and `init` seeds both at the root, so the root's values reach every collection. `description` survives only where the merged metadata is blank, and `id` survives only because the existing file is reloaded first. The `SMART` merge strategy applies to assets and items, not to collection identity fields.
+What `add` still cannot derive is metadata that lives outside the tree: titles and descriptions harvested from an upstream service, originators credited in a free-text attribution field, and hand-written text for layers whose upstream abstract is useless. Keep that in a generator and re-apply it as an idempotent last pass after every `add`. See `reference/tools/apply_metadata.py`. Add a CI gate that regenerates and diffs, so a hand-edit to generated output fails the build rather than surviving until the next regeneration wipes it.
 
-The schema URI is not hardcoded either. The CLI stamps the highest version bundled by the rashid wheel it has installed, so the version you get tracks a dependency rather than the spec release you are targeting. A CLI running rashid 0.1.8 stamps v0.2.0.
-
-Keep authored metadata in a generator and re-apply it as an idempotent last pass after **every** `add`. See `reference/tools/apply_metadata.py`. Add a CI gate that regenerates and diffs, so a hand-edit to generated output fails the build rather than surviving until the next regeneration wipes it.
+Two fields the generator must leave alone. It keeps the root's absolute `self` link, because the spec asks for one (PORTO-CORE-081). It does not touch `updated`, because a mirror sets `updated` to the time of the last sync from source (PORTO-CORE-057), and a metadata re-apply is not a sync.
 
 ### Reference Implementations
 
@@ -361,10 +326,10 @@ Keep authored metadata in a generator and re-apply it as an idempotent last pass
 |---|---|
 | `reencode.py` | Row groups over the `PTL-DAT-008` cap, streamed so peak memory is one batch |
 | `build_collection.py` | Measured extents, counts, and checksums, with a staleness check |
-| `validate_with_data.py` | The data pass having nothing local to read |
-| `sld_graduated.py` | The SLD converter rejecting class-break styles |
+| `validate_with_data.py` | A remote `partition:glob` that the data pass cannot list locally |
+| `sld_graduated.py` | The SLD converter skipping class-break rules |
 | `fix_styles.py` | Generated styles carrying no source URL and no zoom range |
-| `apply_metadata.py` | `add` overwriting authored metadata |
+| `apply_metadata.py` | Metadata `add` cannot derive from the tree |
 
 ## Checkpoints
 
@@ -387,16 +352,17 @@ Keep authored metadata in a generator and re-apply it as an idempotent last pass
 |---|---|
 | Backup contains a credential file | Delete the backup and redo it with explicit excludes |
 | Shell-built manifest looks wrong or empty | Rebuild it in Python and assert the file count |
-| Local and remote metadata disagree | Stop and ask which is authoritative; do not assume local |
+| Local and remote metadata disagree | Stop and ask which is authoritative. Do not assume local |
 | A layer failed extraction in the old catalog | Read the report, check whether the toolchain has since fixed it |
-| Collection directory exists but is unlinked | Decide explicitly whether to link or remove it; do not leave it stranded |
+| Collection directory exists but is unlinked | Decide explicitly whether to link or remove it. Do not leave it stranded |
 | Validator passes on first run | Plant a violation and confirm it fails before believing the pass |
-| A finding cannot be fixed | Add a row to `docs/conformance.md` with a tracking issue, then the id to `ACCEPTED`; never one without the other |
-| `stac-check` crashes on a Collection | Expected; tolerate that one string narrowly and record it |
+| rashid and the spec disagree | The spec decides. File the issue against rashid with the `PORTO` id, and record the workaround in `docs/conformance.md` |
+| A finding cannot be fixed | Add a row to `docs/conformance.md` with a tracking issue, then the id to `ACCEPTED`. Never one without the other |
+| `stac-check` crashes on a Collection | Expected. The template's gate tolerates that one string. Do not re-diagnose it |
 | Style renders blank | Check opacity, colour against background, glyphs, and `match` label types before blaming the renderer |
 | Publisher cartography exists but will not convert | Convert it yourself rather than substituting an invented palette |
-| Number cannot be computed over the full dataset | Say the coverage in the documentation; do not extrapolate from a sample |
-| Sensitivity scan flags a column | Sample values before acting; expect most flags to be false |
-| Remote holds objects your local tree lacks | Refuse to delete them and report; an incomplete local tree looks identical to a stale remote |
-| Documented query fails against published data | Fix the query or delete it; do not ship it broken |
+| Number cannot be computed over the full dataset | Say the coverage in the documentation. Do not extrapolate from a sample |
+| Sensitivity scan flags a column | Sample values before acting. Expect most flags to be false |
+| Remote holds objects your local tree lacks | Refuse to delete them and report. An incomplete local tree looks identical to a stale remote |
+| Documented query fails against published data | Fix the query or delete it. Do not ship it broken |
 | CLI, browser, validator, or spec behaves wrongly | File the issue upstream and record the workaround in `known_issues` |

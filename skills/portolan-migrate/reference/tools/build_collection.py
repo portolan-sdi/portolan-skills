@@ -45,6 +45,9 @@ COLLECTION_DIR = ROOT / "catalog" / COLLECTION_ID
 OUTPUT = COLLECTION_DIR / "collection.json"
 
 PUBLIC_BASE = "https://data.source.coop/<account>/<repository>"
+# An absolute asset href MUST be https (PORTO-CORE-023) and SHOULD also expose
+# an s3 alternate through the alternate-assets extension (PORTO-CORE-024).
+S3_BASE = "s3://<region>.opendata.source.coop/<account>/<repository>"
 PMTILES_NAME = f"{COLLECTION_ID}.pmtiles"
 
 LEGEND_NAME = "<legend>.png"
@@ -274,6 +277,7 @@ def build() -> tuple[dict, list[str]]:
         "https://schemas.portolan-sdi.org/incubating/partition/v1.0.0/schema.json",
         "https://stac-extensions.github.io/table/v1.2.0/schema.json",
         "https://stac-extensions.github.io/file/v2.1.0/schema.json",
+        "https://stac-extensions.github.io/alternate-assets/v1.2.0/schema.json",
     ]
     if not pmtiles.exists():
         header = None
@@ -299,6 +303,9 @@ def build() -> tuple[dict, list[str]]:
                 "level." % (header["min_zoom"], header["max_zoom"])
             ),
             "roles": ["visual"],
+            "alternate": {
+                "s3": {"href": f"{S3_BASE}/{COLLECTION_ID}/{PMTILES_NAME}"}
+            },
             **file_fields(pmtiles),
         }
         pmtiles_link = {

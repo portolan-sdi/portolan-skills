@@ -1,0 +1,6 @@
+.drift-cache/
+.venv/
+__pycache__/
+.pytest_cache/
+.serena/
+.claude/worktrees/

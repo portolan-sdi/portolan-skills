@@ -72,3 +72,19 @@ Files between `ops-sync` markers are synced from [portolan-ops](https://github.c
 
 One canonical home per fact. If a value like a color, URL, or policy line exists in portolan-ops, link to it rather than copying it.
 <!-- ops-sync:end -->
+
+## Skills track pinned upstreams
+
+Every skill states facts about portolan-cli, rashid, the specification, the catalog template, or the registry. `pins.toml` names the version of each that the skills describe. `scripts/check_drift.py` checks every `portolan`, `rashid`, and `gh` command in a bash fence, every `PORTO-*` and `PTL-*` id, every cited `specs/...md` path, and every sample body marked `<!-- drift-sample: issue -->` or `<!-- drift-sample: pr -->` against those versions. Run it before you file a change:
+
+```bash
+uv run scripts/check_drift.py
+```
+
+Pre-commit runs it with `--offline`. The `Drift` workflow runs it on every pull request and once a week. The weekly run fails when a pin lags its upstream and keeps one tracking issue open.
+
+Each `SKILL.md` carries `<!-- drift: depends-on: ... -->` on line 6, which names the upstreams it states facts about. There is no `last-verified` date. `git log pins.toml` records when a pin last moved.
+
+A skill restates nothing that `portolan <cmd> --help`, the spec, or rashid output can answer. Cite a spec rule by its id, such as `PORTO-CORE-081`, instead of paraphrasing it. To show a wrong command on purpose, put `<!-- drift-skip: <reason> -->` on the line before the fence.
+
+To move a pin: edit `pins.toml`, run the checker, and fix every finding in the same pull request.

@@ -18,6 +18,11 @@ index, a 10-class ramp on another.
 A `step` expression is the right target rather than `interpolate`, because a
 step can be summarised into a legend mechanically, which is how
 portolan-browser derives one from the style body.
+
+The output is not loadable on its own. It writes `sources.data` as
+`{"type": "vector"}` with no `url`, and a style MUST be self-contained
+(PORTO-FMT-015). Run fix_styles.py over the result to add the PMTiles source
+URL and the zoom range before the style ships.
 """
 
 import xml.etree.ElementTree as ET

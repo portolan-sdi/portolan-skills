@@ -4,6 +4,8 @@ AI agent skills for working with [Portolan](https://github.com/portolan-sdi/port
 
 Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
 
+The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
+
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
@@ -13,27 +15,23 @@ Create, maintain, or contribute to a Portolan catalog whose metadata lives in a 
 
 ### `portolan-bootstrap`
 
-Build a complete, well-documented Portolan catalog from a data source — research the data and its publisher, convert to cloud-native formats, write documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
+Build a complete, well-documented Portolan catalog from a data source. Research the data and its publisher, convert to cloud-native formats, write the documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
 
 ### `portolan-cli`
 
 Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
 
-### `portolan-consume`
-
-Guide users through querying and exploring Portolan/STAC catalogs with optimized GeoParquet and COGs
-
 ### `portolan-migrate`
 
-Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it — audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
+Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
 
 ### `portolan-thumbnails`
 
-Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with an optional basemap, frames every bbox to the browser card's 3:2 shape, and gates each image on an automated blank probe plus a visual review. Requires Node.js 18+.
+Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style asset server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, gates each image on an automated blank probe plus a visual review, then refreshes file:size and file:checksum with portolan check --fix. Requires Node.js 24.12 or newer.
 
 ### `reading-portolan`
 
-Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers navigating STAC metadata, querying GeoParquet with DuckDB, cross-dataset joins, geospatial analysis, and creating interactive maps with PMTiles/MapLibre/deck.gl/Potree.
+Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers reading AGENTS.md and STAC metadata, finding assets by role, querying GeoParquet and Parquet with DuckDB, reading COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
 
 ### `register-catalog`
 
@@ -58,7 +56,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-consume`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
+Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
 ### Claude Code (Web / Cowork)
 
@@ -76,8 +74,6 @@ gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-bootstrap --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-cli --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-consume --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-migrate --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \

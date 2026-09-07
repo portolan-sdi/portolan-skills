@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!--
+  Map a Portolan collection that ships no style asset.
+  Set PMTILES_URL from the collection's rel: pmtiles link.
+  Set SOURCE_LAYER from that link's pmtiles:layers array.
+-->
+<html>
+<head>
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/pmtiles/dist/pmtiles.js"></script>
+    <style>body { margin: 0; } #map { width: 100%; height: 100vh; }</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
+
+const PMTILES_URL = "https://example.com/catalog/collection/data.pmtiles";
+const SOURCE_LAYER = "data";
+
+const map = new maplibregl.Map({
+    container: "map",
+    style: {
+        version: 8,
+        sources: {
+            data: { type: "vector", url: "pmtiles://" + PMTILES_URL }
+        },
+        layers: [{
+            id: "data-layer",
+            type: "fill",
+            source: "data",
+            "source-layer": SOURCE_LAYER,
+            paint: {
+                "fill-color": "#3388ff",
+                "fill-opacity": 0.6,
+                "fill-outline-color": "#2266cc"
+            }
+        }]
+    }
+});
+
+map.addControl(new maplibregl.NavigationControl());
+
+// Popup on click.
+map.on("click", "data-layer", (e) => {
+    const props = e.features[0].properties;
+    new maplibregl.Popup()
+        .setLngLat(e.lngLat)
+        .setHTML("<pre>" + JSON.stringify(props, null, 2) + "</pre>")
+        .addTo(map);
+});
+map.on("mouseenter", "data-layer", () => map.getCanvas().style.cursor = "pointer");
+map.on("mouseleave", "data-layer", () => map.getCanvas().style.cursor = "");
+</script>
+</body>
+</html>

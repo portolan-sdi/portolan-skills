@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!--
+  Map a Portolan collection with one of its own style assets.
+  Set COLLECTION_BASE to the directory that holds collection.json.
+  Set STYLE_HREF to the href of the asset whose roles include "style"
+  (prefer the one that also carries "default").
+-->
+<html>
+<head>
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/pmtiles/dist/pmtiles.js"></script>
+    <style>body { margin: 0; } #map { width: 100%; height: 100vh; }</style>
+</head>
+<body>
+<div id="map"></div>
+<script>
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
+
+const COLLECTION_BASE = "https://example.com/catalog/collection";
+const STYLE_HREF = "./styles/default.json";
+
+let map;
+
+// A style file names its PMTiles source relative to the styles/ directory,
+// for example "pmtiles://../data.pmtiles". Resolve that against the style
+// URL, not against the collection URL.
+async function loadStyle(styleHref) {
+    const styleUrl = new URL(styleHref, COLLECTION_BASE + "/").href;
+    const style = await (await fetch(styleUrl)).json();
+    for (const source of Object.values(style.sources)) {
+        if (source.url && source.url.startsWith("pmtiles://")) {
+            const rel = source.url.replace("pmtiles://", "");
+            source.url = "pmtiles://" + new URL(rel, styleUrl).href;
+        }
+    }
+    return style;
+}
+
+async function initMap() {
+    const style = await loadStyle(STYLE_HREF);
+    map = new maplibregl.Map({ container: "map", style });
+    map.addControl(new maplibregl.NavigationControl());
+}
+
+// Switch to another style asset of the same collection.
+async function switchStyle(styleHref) {
+    map.setStyle(await loadStyle(styleHref));
+}
+
+initMap();
+</script>
+</body>
+</html>

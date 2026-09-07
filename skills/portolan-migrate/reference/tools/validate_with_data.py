@@ -5,17 +5,20 @@ From microsoft-ml-road-detections (tools/validate_with_data.py). Generalized
 as a reference; edit the constants under "What a new catalog must change".
 
 The published catalog addresses its data with absolute https hrefs and an
-absolute `partition:glob`, which is correct and is also why the byte-level
-checks cannot run locally: those URLs do not resolve until the data is
-uploaded. `--data-scope local` skips them silently, so a clean run there
-proves nothing about the GeoParquet.
+`s3://` `partition:glob`, which is correct (PORTO-FMT-020). It is also why
+the partition checks cannot run locally. Rashid expands only a local relative
+glob against the collection's own directory. A remote or absolute glob cannot
+be listed from the local tree, so rashid reads none of the partitions and the
+run stays clean. That silence is the glob, not `--data-scope`. `--data-scope
+local` only limits the byte checks to assets inside the catalog tree.
 
-This builds a throwaway tree that mirrors the published layout, with the
-remote references rewritten to local ones and the partitions symlinked rather
-than copied, then runs rashid over it with the data pass enabled. That is what
-exercises PTL-DAT-006 (spatial ordering), 007 (per-row-group statistics), 008
-(the 150,000-row cap), 012 (GeoParquet version) and 014 (one schema across
-partitions) against real bytes.
+This builds a throwaway tree that mirrors the published layout, with the glob
+rewritten to a local relative pattern, the remote hrefs rewritten to local
+ones, and the partitions symlinked rather than copied. It then runs rashid
+over it with the data pass enabled. That is what exercises PTL-DAT-006
+(spatial ordering), 007 (per-row-group statistics), 008 (the 150,000-row cap),
+012 (GeoParquet version) and 014 (one schema across partitions) against real
+bytes. Each rule reports once per collection, at `/partition:glob`.
 
 Checksums still match because the symlinks point at the same files the
 generator measured.

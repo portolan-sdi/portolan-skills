@@ -7,3 +7,9 @@ repos:
         language: python
         pass_filenames: false
         files: ^skills/.*/SKILL\.md$|^README\.md$
+      - id: check-drift
+        name: Check skills against the pinned upstreams
+        entry: uv run scripts/check_drift.py --offline
+        language: system
+        pass_filenames: false
+        files: ^skills/.*\.md$|^pins\.toml$|^scripts/check_drift\.py$

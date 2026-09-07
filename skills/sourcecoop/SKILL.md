@@ -3,485 +3,221 @@ name: sourcecoop
 description: Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI.
 ---
 
-
-<!-- freshness: last-verified: 2026-08-12, maps-to: portolan_cli/cli.py -->
+<!-- drift: depends-on: portolan-cli, rashid, portolan-spec -->
 
 # Source Cooperative Upload Skill
 
-You are helping a user publish geospatial data to [Source Cooperative](https://source.coop), an open data commons for geospatial data. This skill orchestrates the full Portolan pipeline to ensure data is properly formatted, documented, and uploaded.
+You are helping a user publish a Portolan catalog to [Source Cooperative](https://source.coop), an open data commons for geospatial data. This skill covers the upload path. To build the catalog from a data source, use the `portolan-bootstrap` skill first, then return here.
+
+The [Portolan spec](https://github.com/portolan-sdi/portolan-spec) is ground truth. The CLI and the validator implement it. Run `portolan <cmd> --help` for the flags of any command below. Do not restate the help text in your answers.
 
 ## Prerequisites
 
-**Source Cooperative requires automated access for programmatic uploads.**
-
-Before proceeding, verify the user has automated access:
+Source Cooperative requires automated access for programmatic uploads. Check for it before anything else:
 
 ```bash
-# Check for Source Co-op AWS profile
-grep -l "source" ~/.aws/credentials 2>/dev/null || echo "No source profile found"
-
-# Check Portolan config
-portolan config get profile 2>/dev/null
-portolan config get remote 2>/dev/null
+grep -l "source" ~/.aws/credentials 2>/dev/null \
+  || echo "No source profile found"
+portolan config list
 ```
 
-**If no credentials are configured:**
-- Users WITH automated access: Guide them through credential setup (see Credential Setup section)
-- Users WITHOUT automated access: Direct them to request access at **hello@source.coop**
-
----
+If no credentials exist, the user with automated access sets them up in Step 2. The user without access requests it at hello@source.coop.
 
 ## Workflow Overview
 
-This skill covers the upload path. To build the catalog itself from a data source — extraction, metadata enrichment, styles, thumbnails — use the `portolan-bootstrap` skill first, then return here to publish.
-
-The Source Co-op upload workflow follows these steps:
-
-1. **Initialize** — Create Portolan catalog structure
-2. **Configure** — Set remote destination and AWS profile
-3. **Add** — Track files in the catalog
-4. **Metadata** — Create and validate metadata.yaml across the catalog
-5. **README** — Generate READMEs from metadata
-6. **Push** — Upload to Source Co-op with parallel workers
-
----
+1. Gather the organization and product names.
+2. Set credentials in `.env`.
+3. Initialize the catalog with a license.
+4. Add files.
+5. Write metadata: contact, license, providers, `source_url`.
+6. Generate READMEs and write `AGENTS.md`.
+7. Run the validator locally.
+8. Push, then probe the published host.
 
 ## Step 1: Gather Information
 
 Ask the user for:
 
-1. **Organization name** (required): Their Source Co-op organization slug
-   - Example: `nlebovits`, `radiant-mlhub`, `vida`
-
-2. **Product name** (optional): Defaults to current directory name
-   - Example: `phl-aerial-imagery`, `global-building-footprints`
+1. The Source Cooperative organization slug (required). Examples: `nlebovits`, `radiant-mlhub`, `vida`.
+2. The product name (optional). Defaults to the current directory name.
 
 Build the remote URL:
+
 ```
 s3://us-west-2.opendata.source.coop/{org}/{product}/
 ```
 
----
-
 ## Step 2: Credential Setup
 
-If credentials aren't configured, guide the user:
+The CLI refuses to store `remote`, `profile`, and `region` in `.portolan/config.yaml`. That file is pushed with the catalog. Put them in `.env` at the catalog root or in `PORTOLAN_REMOTE` and `PORTOLAN_PROFILE` environment variables.
 
 ```bash
-# 1. Create/edit AWS credentials file
-# Add a profile named "source-coop" with their Source Co-op credentials:
-#
-# ~/.aws/credentials:
-# [source-coop]
-# aws_access_key_id = <from Source Co-op dashboard>
-# aws_secret_access_key = <from Source Co-op dashboard>
-
-# 2. Create .env file in catalog root (never pushed to remote)
+# ~/.aws/credentials needs a profile named "source-coop"
+# with the key pair from the Source Cooperative dashboard.
 cat > .env << 'EOF'
 PORTOLAN_REMOTE=s3://us-west-2.opendata.source.coop/{org}/{product}/
 PORTOLAN_PROFILE=source-coop
 EOF
 
-# Verify configuration
 portolan config list
 ```
 
-**Security note:** Credentials (remote, profile, region) are stored in `.env` files or environment variables — never in `.portolan/config.yaml`. This prevents accidentally pushing credentials to public buckets.
-
-**Important:** Source Co-op uses temporary credentials. If uploads fail with auth errors, the user may need to refresh their credentials from the Source Co-op dashboard.
-
----
+Source Cooperative issues temporary credentials. When an upload fails with an auth error, refresh the key pair from the dashboard.
 
 ## Step 3: Initialize Catalog
 
-```bash
-# Initialize if not already a catalog
-portolan init --title "{product_title}" --auto
+`portolan init` requires a license. With `--auto` and no `--license`, it exits with `PRTLN-VAL004`. Every collection inherits the catalog license, and `portolan add` refuses a collection without one.
 
-# Or if catalog exists, verify structure
+```bash
+portolan init --title "{product_title}" --auto --license CC-BY-4.0
 portolan info
 ```
 
----
+`init` writes `catalog.json`, `AGENTS.md`, and `README.md` beside each other, linked with `rel: agents` and `rel: describedby` (PORTO-CORE-005, PORTO-CORE-061, PORTO-CORE-062). It also writes `versions.json`. That file is a CLI artifact, not part of the spec.
 
-## Step 4: Configure Remote
+## Step 4: add files
 
-Credentials are stored in `.env` file (created in Step 2), not in config.yaml:
-
-```bash
-# Verify .env file exists with correct values
-cat .env
-# Should show:
-# PORTOLAN_REMOTE=s3://us-west-2.opendata.source.coop/{org}/{product}/
-# PORTOLAN_PROFILE=source-coop
-
-# Verify Portolan reads the config
-portolan config list
-```
-
----
-
-## Step 5: Add Files
-
-**Important:** Files must be organized in collection subdirectories. Files at the catalog root are skipped.
-
-```
-my-catalog/
-├── catalog.json
-├── buildings/          # <-- Collection subdirectory
-│   └── data.parquet    # <-- Files go here
-└── imagery/            # <-- Another collection
-    └── ortho.tif
-```
+Files must sit in collection subdirectories. Files at the catalog root are skipped.
 
 ```bash
-# Organize files into collection subdirectories first if needed
 mkdir -p buildings
 mv *.parquet buildings/
-
-# Add all collections
 portolan add .
-
-# Or add specific collections
-portolan add buildings/
-portolan add imagery/
 ```
 
----
+Add `--pmtiles` for vector collections so the catalog ships a render path (PORTO-CORE-065). The CLI writes the PMTiles as a `rel: pmtiles` link with a `pmtiles:layers` array (PORTO-FMT-011) and a default style asset under `styles/`.
 
-## Step 6: Create Metadata
+## Step 5: write metadata
 
-Source Cooperative emphasizes good metadata. `portolan metadata init` walks the whole catalog by default, creating a template at every STAC level:
+`portolan metadata init` writes a `.portolan/metadata.yaml` template at every STAC level. `portolan metadata validate` requires `contact.name`, `contact.email`, and `license`. Nothing else is required by the CLI. The spec requires more.
+
+Fill these fields at every level:
+
+- `contact`: name and email of the maintainer.
+- `license`: an SPDX identifier.
+- `providers`: at least one `producer`, the organization that created the data (PORTO-CORE-047). The `host` is whoever maintains this catalog, not AWS or Source Cooperative. Leave the host out and the CLI derives it from `contact`. The host needs a `url` or an `email` (PORTO-CORE-051).
+- `source_url`: the page the data came from.
+
+Most Source Cooperative uploads are mirrors. The producer and the host differ. For a mirror, the spec requires a `via` link of type `text/html` to the original source (PORTO-CORE-053) and a top-level `updated` field set at each sync (PORTO-CORE-057). The CLI derives both from `providers` and `source_url` when you run `portolan add`. When the source publishes its own STAC catalog, add a `canonical` link to that STAC root as well (PORTO-CORE-054).
+
+Temporal defaults for items without a date live under `defaults.temporal` in the same file. There is no `temporal_extent` key.
+
+Recommended fields: `keywords`, `citation`, `attribution`, `processing_notes`, and `known_issues`.
 
 ```bash
-# Initialize metadata templates for catalog and all collections
 portolan metadata init
-
-# Only the catalog root, no subdirectories
-portolan metadata init --no-recursive
-```
-
-**Required fields** (validate these exist):
-- `title` — Human-readable title
-- `description` — What the data contains, its purpose
-- `license` — SPDX license identifier (e.g., `CC-BY-4.0`, `CC0-1.0`, `ODbL-1.0`)
-- `contact.email` — Contact email for questions
-
-**Recommended fields** (prompt user for these):
-- `keywords` — List of tags for discoverability
-- `citation` — How to cite this collection
-- `temporal_extent` — Time range the data covers
-- `providers` — Organizations that created/host the data
-
-```bash
-# Validate metadata after editing (walks the catalog by default)
 portolan metadata validate
 ```
 
----
-
-## Step 7: Generate READMEs
+## Step 6: Generate READMEs and write AGENTS.md
 
 ```bash
-# Generate READMEs for catalog and all collections
 portolan readme
-
-# Verify READMEs look correct
-cat README.md
 ```
 
-Never hand-edit a generated README. Edit `.portolan/metadata.yaml` and regenerate.
+Never hand-edit a generated README. Edit `.portolan/metadata.yaml` and regenerate. The README must carry a title, a description, the license, and the data provenance (PORTO-CORE-063).
 
----
+`AGENTS.md` is not generated from metadata. The CLI scaffolds a stub. Replace the stub at the catalog and at every collection with real content: what the data is, how the files connect, and queries you ran against the data. Follow the `portolan-bootstrap` skill and `specs/best-practices/documentation.md` for what belongs there.
 
 ## Linking to Source Cooperative
 
-Source Cooperative serves the same objects under two hostnames, and they behave differently. `source.coop` renders a page a person can read: the repository description, the README, a file listing. `data.source.coop` returns raw bytes, so a browser opening one of those links shows unformatted JSON.
+Source Cooperative serves the same objects under two hostnames. `source.coop` renders a page a person can read. `data.source.coop` returns raw bytes.
 
-Use `source.coop` for anything rendered for a human, and `data.source.coop` only where a machine fetches raw bytes.
-
-- **`source.coop`** — links in `metadata.yaml`, STAC `description` fields, generated READMEs, issue and pull request bodies, announcements.
-- **`data.source.coop`** — STAC asset `href` values, `curl`, DuckDB `read_parquet()`, HTTP range requests, anything a client resolves programmatically.
+- `source.coop`: links in `metadata.yaml`, STAC `description` fields, generated READMEs, issue and pull request bodies.
+- `data.source.coop`: STAC asset `href` values, `curl`, DuckDB `read_parquet()`, anything a client resolves programmatically.
 
 ```
 https://source.coop/{org}/{product}                       # human-facing page
 https://data.source.coop/{org}/{product}/catalog.json     # machine-facing bytes
 ```
 
----
+## Step 7: Validate before push
 
-## Step 8: Push to Source Co-op
+An object conforms only when it passes the validator. Run it before every push and fix every error:
 
 ```bash
-# Determine optimal worker count (max 8)
-# workers = min(cpu_count, 8)
+portolan check
+```
 
-# Dry run first to preview
+Read the PTL rule ids in the output. Each one cites the spec requirement it enforces.
+
+## Step 8: Push and probe
+
+```bash
 portolan push --dry-run
-
-# Push with parallel uploads
-portolan push --workers {workers} --verbose
+portolan push --verbose
 ```
 
-**Worker recommendation:**
-- 1-2 cores: `--workers 1`
-- 4 cores: `--workers 4`
-- 8+ cores: `--workers 8`
+`--workers` sets the number of parallel collections and has no cap. `--concurrency` sets the concurrent uploads within a collection and defaults to 8. On a home network, leave `--adaptive` on and lower `--chunk-concurrency` before you raise anything.
 
----
-
-<!-- BEGIN GENERATED: cli-reference -->
-## CLI Command Reference
-
-### `portolan init`
-Initialize a new Portolan catalog.
+After the push, probe the published host. The host must honor `Range` requests with an accurate HEAD `Content-Length` (PORTO-CORE-043) and send CORS headers on every file (PORTO-CORE-045). `rashid check` takes the local catalog directory, never a URL. The base URL makes the relative hrefs probeable:
 
 ```bash
-portolan init                       # Initialize in current directory
-portolan init --auto                # Skip prompts, use defaults
-portolan init --title "My Catalog"  # Set title
+rashid check --live \
+  --live-base-url https://data.source.coop/{org}/{product}/ .
 ```
 
-### `portolan config set`
-Set a configuration value.
+Then open the catalog in the browser and confirm the default style renders visible data: `https://browser.portolan-sdi.org/#/external/data.source.coop/{org}/{product}/catalog.json`.
 
-```bash
-portolan config set remote s3://bucket/path/   # Set remote destination
-portolan config set profile source-coop        # Set AWS profile
-```
+## Styles
 
-### `portolan config get`
-Get a configuration value.
+Styles are collection-level assets with the `style` role and media type `application/vnd.mapbox.style+json` (PORTO-CORE-069, PORTO-FMT-015). With more than one style, exactly one asset carries both `style` and `default` (PORTO-CORE-070). The CLI writes the source URL in each style as `pmtiles://../<file>.pmtiles`. A bare relative path fails to load in MapLibre. There is no `portolan:styles` array in the spec.
 
-```bash
-portolan config get remote                     # Get current remote
-```
-
-### `portolan config list`
-List all configuration settings.
-
-```bash
-portolan config list                           # List all settings
-```
-
-### `portolan add`
-Track files in the catalog.
-
-```bash
-portolan add .                    # Add all files
-portolan add demographics/        # Add collection
-portolan add file1.parquet        # Add specific file
-portolan add . --pmtiles          # Also generate PMTiles (needs tippecanoe)
-portolan add . --workers 4        # Parallel metadata extraction
-```
-
-### `portolan metadata init`
-Generate a metadata.yaml template.
-
-```bash
-portolan metadata init                  # Create templates at every level
-portolan metadata init --no-recursive   # Catalog root only
-```
-
-### `portolan metadata validate`
-Validate metadata.yaml against schema.
-
-```bash
-portolan metadata validate                  # Validate every level
-portolan metadata validate --no-recursive   # Catalog root only
-```
-
-### `portolan readme`
-Generate README.md from STAC metadata and metadata.yaml.
-
-```bash
-portolan readme                    # Generate for catalog and all collections
-portolan readme --no-recursive     # Catalog root only
-portolan readme --check            # CI mode: exit 1 if stale
-```
-
-### `portolan push`
-Push local catalog changes to cloud object storage.
-
-```bash
-portolan push                              # Push to configured remote
-portolan push --dry-run                    # Preview without uploading
-portolan push --workers 8                  # Parallel uploads (max 8 recommended)
-portolan push --verbose                    # Show per-file progress
-portolan push --profile source-coop        # Override AWS profile
-```
-
-<!-- END GENERATED: cli-reference -->
-
----
+Style files upload with `portolan push` like any other asset. For how many styles to write and what they should show, follow the `portolan-bootstrap` skill and `specs/best-practices/styling.md`.
 
 ## Troubleshooting
 
-### "Access Denied" or "403 Forbidden"
+### Access denied or 403 Forbidden
 
-**Cause:** AWS credentials are invalid, expired, or don't have permission for this bucket prefix.
+The credentials are invalid, expired, or scoped to another prefix.
 
-**Solution:**
-1. Verify credentials in `~/.aws/credentials` under `[source-coop]`
-2. Check that the remote URL matches your assigned prefix exactly
-3. Refresh credentials from Source Co-op dashboard if they've expired
-4. Contact hello@source.coop if you need access to a different prefix
+1. Check `~/.aws/credentials` under `[source-coop]`.
+2. Check that `PORTOLAN_REMOTE` matches the assigned prefix exactly.
+3. Refresh the credentials from the Source Cooperative dashboard.
+4. Contact hello@source.coop for access to a different prefix.
 
-### "No such bucket" or "Bucket not found"
+### No such bucket
 
-**Cause:** The bucket name is wrong.
+The bucket is always `us-west-2.opendata.source.coop`. Check `PORTOLAN_REMOTE` in `.env`.
 
-**Solution:** Source Co-op bucket is always `us-west-2.opendata.source.coop`. Check your remote:
+### Push conflict
+
+Someone else pushed since your last pull. `portolan pull` requires the remote URL as an argument:
+
 ```bash
-portolan config get remote
-# Should be: s3://us-west-2.opendata.source.coop/{org}/{product}/
-```
-
-### "Push conflict: remote has newer version"
-
-**Cause:** Someone else pushed changes since your last pull.
-
-**Solution:**
-```bash
-portolan pull   # Get remote changes first
-# Resolve any conflicts
-portolan push   # Try again
+portolan pull s3://us-west-2.opendata.source.coop/{org}/{product}/
+portolan push
 ```
 
 ### Slow uploads
 
-**Cause:** Single-threaded upload or large files.
+Raise `--concurrency` first, then `--workers` when the catalog has many collections. Watch for errors.
 
-**Solution:**
-```bash
-# Use parallel workers (max 8)
-portolan push --workers 8 --verbose
-```
+### Metadata validation fails
 
-### Missing metadata validation
+Run `portolan metadata validate`. Add the missing `contact.name`, `contact.email`, or `license` to the named `metadata.yaml`.
 
-**Cause:** metadata.yaml is missing required fields.
+### Live probe fails
 
-**Solution:**
-```bash
-portolan metadata validate
-# Edit metadata.yaml files to add missing fields
-# Required: title, description, license, contact.email
-```
-
----
+A CORS or range finding from `rashid check --live` names a host you do not control. Report it to hello@source.coop with the failing URL and the rule id.
 
 ## Complete Example
 
 ```bash
-# 1. Navigate to your data directory
 cd ~/data/phl-aerial-imagery
-
-# 2. Initialize catalog
-portolan init --title "Philadelphia Aerial Imagery" --auto
-
-# 3. Configure Source Co-op credentials via .env file
+portolan init --title "Philadelphia Aerial Imagery" --auto --license CC-BY-4.0
 cat > .env << 'EOF'
 PORTOLAN_REMOTE=s3://us-west-2.opendata.source.coop/nlebovits/phl-aerial-imagery/
 PORTOLAN_PROFILE=source-coop
 EOF
-
-# 4. Add files
-portolan add .
-
-# 5. Create and edit metadata
+portolan add . --pmtiles
 portolan metadata init
-# Edit .portolan/metadata.yaml with title, description, license, contact
-
-# 6. Generate READMEs
+# Edit .portolan/metadata.yaml: contact, license, providers, source_url
+portolan metadata validate
 portolan readme
-
-# 7. Push to Source Co-op
-portolan push --workers 8 --verbose
+# Write AGENTS.md at the catalog and at every collection
+portolan check
+portolan push --verbose
+rashid check --live \
+  --live-base-url https://data.source.coop/nlebovits/phl-aerial-imagery/ .
 ```
-
----
-
-## Styles
-
-A collection can ship several named visualization styles. Each one is a MapLibre GL style file (`"version": 8`) stored in `{collection}/styles/`.
-
-### Creating Styles
-
-Style files are complete MapLibre GL styles with relative PMTiles source paths:
-
-```json
-{
-  "version": 8,
-  "name": "Buildings by Construction Year",
-  "sources": {
-    "data": {
-      "type": "vector",
-      "url": "../data.pmtiles"
-    }
-  },
-  "layers": [
-    {
-      "id": "buildings-by-age",
-      "type": "fill",
-      "source": "data",
-      "source-layer": "layer_name",
-      "paint": {
-        "fill-color": ["interpolate", ["linear"], ["get", "bouwjaar"],
-          1400, "#1a0a00", 1900, "#8B4513", 1960, "#DAA520", 2020, "#FFFF00"
-        ],
-        "fill-opacity": 0.7
-      }
-    }
-  ]
-}
-```
-
-A default style is written to `styles/default.json` when Portolan generates PMTiles. Drop additional style files into `styles/` and they are discovered from there.
-
-### STAC Registration
-
-Every style is a collection-level asset carrying the `style` role. Clients find a collection's styles by filtering assets on that role, so the Portolan spec defines no style manifest. When a collection ships more than one style, exactly one asset carries both `style` and `default` in its `roles`:
-
-```json
-{
-  "assets": {
-    "style": {
-      "href": "./styles/default.json",
-      "type": "application/json",
-      "title": "Buildings by age",
-      "description": "Fill color runs from 1400 to 2020 construction year.",
-      "roles": ["style", "default"]
-    },
-    "style-by-use": {
-      "href": "./styles/by-use.json",
-      "type": "application/json",
-      "title": "Buildings by use",
-      "roles": ["style"]
-    }
-  }
-}
-```
-
-Asset keys carry no meaning to a client; `style-<variant>` is the convention. The reader sees the asset `title` in the style picker, so write titles for people rather than for filenames. Current CLI releases also write a legacy `portolan:styles` array next to these assets (`portolan_cli/viz/style.py`), which the spec no longer defines.
-
-### Style Craft
-
-The spec's [styling best practices](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/styling.md) cover how many styles to write, how to vary colors across a catalog, and when to add labels. Follow that guidance rather than restating it here.
-
-Two things are specific to publishing on Source Cooperative:
-
-- Style files are ordinary catalog assets, so they upload with `portolan push` and are served from the bucket. Keep the `sources.url` in each style file a relative path to the PMTiles asset, so the style keeps working wherever the catalog is mirrored.
-- Review styles as published, not only as JSON on disk. After pushing, open the collection in the Portolan browser: `https://browser.portolan-sdi.org/#/external/data.source.coop/{org}/{product}/{collection}/collection.json`.
-
----
-
-## Source Cooperative Best Practices
-
-1. **Use descriptive titles** — "Philadelphia 2023 Aerial Orthoimagery" not "imagery"
-2. **Include spatial coverage** — Mention the geographic area in the description
-3. **Specify temporal extent** — When was the data collected?
-4. **Choose appropriate license** — CC-BY-4.0 or CC0-1.0 are common for open data
-5. **Add keywords** — Help users discover your data (e.g., "aerial", "orthoimagery", "philadelphia", "pennsylvania")
-6. **Provide contact info** — So users can ask questions about the data
-<!-- /freshness -->
