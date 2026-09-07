@@ -73,7 +73,7 @@ Files between `ops-sync` markers are synced from [portolan-ops](https://github.c
 One canonical home per fact. If a value like a color, URL, or policy line exists in portolan-ops, link to it rather than copying it.
 <!-- ops-sync:end -->
 
-## Skills Track Pinned Upstreams
+## Skills track pinned upstreams
 
 Every skill states facts about portolan-cli, rashid, the specification, the catalog template, or the registry. `pins.toml` names the version of each that the skills describe. `scripts/check_drift.py` checks every `portolan`, `rashid`, and `gh` command in a bash fence, every `PORTO-*` and `PTL-*` id, every cited `specs/...md` path, and every sample body marked `<!-- drift-sample: issue -->` or `<!-- drift-sample: pr -->` against those versions. Run it before you file a change:
 

@@ -55,7 +55,7 @@ Anything else is invention, including the plausible kind. Guessing that pipe-mat
 
 When research fails, say so. "The publisher has not released a code list for `MATERIAL`. The values are opaque integers" is honest and useful. A column left undescribed is a smaller failure than a column described wrongly. Record such gaps in `known_issues` in `.portolan/metadata.yaml`.
 
-### Provenance Fields
+### Provenance fields
 
 The spec derives whether a catalog is official or a mirror from `providers`. Every collection MUST list `providers` with at least one `producer` and exactly one `host`, listed last (PORTO-CORE-046, PORTO-CORE-047). The host MUST carry a `url` or an `email` (PORTO-CORE-051). When producer and host differ, the collection is a mirror. A mirror MUST carry a `via` link of type `text/html` to the original source (PORTO-CORE-053) and a top-level `updated` field set to the time of the sync (PORTO-CORE-057).
 
@@ -160,7 +160,7 @@ Present this before extracting anything:
 
 Ask whether to proceed with this candidate set.
 
-## Collection Layout
+## Collection layout
 
 The layout decision is the one the validator cannot make for you. A catalog with no item JSON at all can pass `portolan check`. A human found one such defect in a bucket listing, after a 619-scene collection had shipped as bare COGs under one directory with no items.
 

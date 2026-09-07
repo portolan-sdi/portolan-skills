@@ -75,7 +75,7 @@ portolan info
 
 `init` writes `catalog.json`, `AGENTS.md`, and `README.md` beside each other, linked with `rel: agents` and `rel: describedby` (PORTO-CORE-005, PORTO-CORE-061, PORTO-CORE-062). It also writes `versions.json`. That file is a CLI artifact, not part of the spec.
 
-## Step 4: Add Files
+## Step 4: Add files
 
 Files must sit in collection subdirectories. Files at the catalog root are skipped.
 
@@ -87,7 +87,7 @@ portolan add .
 
 Add `--pmtiles` for vector collections so the catalog ships a render path (PORTO-CORE-065). The CLI writes the PMTiles as a `rel: pmtiles` link with a `pmtiles:layers` array (PORTO-FMT-011) and a default style asset under `styles/`.
 
-## Step 5: Write Metadata
+## Step 5: Write metadata
 
 `portolan metadata init` writes a `.portolan/metadata.yaml` template at every STAC level. `portolan metadata validate` requires `contact.name`, `contact.email`, and `license`. Nothing else is required by the CLI. The spec requires more.
 
@@ -109,7 +109,7 @@ portolan metadata init
 portolan metadata validate
 ```
 
-## Step 6: Generate READMEs and Write AGENTS.md
+## Step 6: Generate READMEs and write AGENTS.md
 
 ```bash
 portolan readme
@@ -131,7 +131,7 @@ https://source.coop/{org}/{product}                       # human-facing page
 https://data.source.coop/{org}/{product}/catalog.json     # machine-facing bytes
 ```
 
-## Step 7: Validate Before Push
+## Step 7: Validate before push
 
 An object conforms only when it passes the validator. Run it before every push and fix every error:
 
@@ -141,7 +141,7 @@ portolan check
 
 Read the PTL rule ids in the output. Each one cites the spec requirement it enforces.
 
-## Step 8: Push and Probe
+## Step 8: Push and probe
 
 ```bash
 portolan push --dry-run
@@ -167,7 +167,7 @@ Style files upload with `portolan push` like any other asset. For how many style
 
 ## Troubleshooting
 
-### Access Denied or 403 Forbidden
+### Access denied or 403 Forbidden
 
 The credentials are invalid, expired, or scoped to another prefix.
 
@@ -176,11 +176,11 @@ The credentials are invalid, expired, or scoped to another prefix.
 3. Refresh the credentials from the Source Cooperative dashboard.
 4. Contact hello@source.coop for access to a different prefix.
 
-### No Such Bucket
+### No such bucket
 
 The bucket is always `us-west-2.opendata.source.coop`. Check `PORTOLAN_REMOTE` in `.env`.
 
-### Push Conflict
+### Push conflict
 
 Someone else pushed since your last pull. `portolan pull` requires the remote URL as an argument:
 
@@ -189,15 +189,15 @@ portolan pull s3://us-west-2.opendata.source.coop/{org}/{product}/
 portolan push
 ```
 
-### Slow Uploads
+### Slow uploads
 
 Raise `--concurrency` first, then `--workers` when the catalog has many collections. Watch for errors.
 
-### Metadata Validation Fails
+### Metadata validation fails
 
 Run `portolan metadata validate`. Add the missing `contact.name`, `contact.email`, or `license` to the named `metadata.yaml`.
 
-### Live Probe Fails
+### Live probe fails
 
 A CORS or range finding from `rashid check --live` names a host you do not control. Report it to hello@source.coop with the failing URL and the rule id.
 

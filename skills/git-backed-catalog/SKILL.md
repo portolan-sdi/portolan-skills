@@ -19,7 +19,7 @@ See the [git-backed catalogs guidance](https://github.com/portolan-sdi/portolan-
 
 Pick the mode that matches what the user asked for.
 
-## Mode A: Create a New Git-Backed Catalog
+## Mode A: Create a new Git-backed catalog
 
 This path suits a catalog that takes contributions or needs rollback. If the user wants to convert a data source and publish it to a bucket, use the `portolan-bootstrap` skill instead.
 
@@ -50,11 +50,11 @@ Two guards stop you, and both are deliberate:
 * `tests/test_setup.py` fails while the repository is half-edited. An untouched template passes, and so does a finished one.
 * `tools/publish.py` refuses to upload while a sentinel value survives in `catalog.publish.yaml`. It checks before any AWS call, so this works without credentials.
 
-### Declare the Current Schema Version
+### Declare the current schema version
 
 The template at `ed23c3b` declares `https://schemas.portolan-sdi.org/portolan/v0.1.1/schema.json` in `catalog/catalog.json`. Change it to the v0.2.0 URI before you add anything (PORTO-CORE-006). Every object in the tree declares the same URI (PORTO-CORE-009). A v0.1.1 catalog that carries an absolute `self` link fails validation, because v0.1.1 forbids that link and v0.2.0 recommends it (PORTO-CORE-081).
 
-### Raise the Validator Floor in the Gate
+### Raise the validator floor in the gate
 
 `tests/test_conformance.py` fails when `rashid` is absent or outside its version range. The template hard-codes `MIN_VERSION = (0, 1, 5)` and `SPEC = "rashid>=0.1.5,<0.2.0"`. Raise both to `0.1.8`, which is the first version that accepts a v0.2.0 root `self` link. Install the same version into a repository virtualenv, so the version the tests find is the version CI installs:
 
@@ -64,7 +64,7 @@ python3 -m venv .venv
 .venv/bin/rashid --version
 ```
 
-### Adding a Collection
+### Adding a collection
 
 Data files do not belong in git. Build them, upload them to the bucket, and write STAC that references them by public URL. The `.gitignore` already blocks common data formats.
 
@@ -76,7 +76,7 @@ The single-file rule is the exception: one GeoParquet file or one COG is a colle
 
 Run the gates before committing. `tests/test_links.py` catches a `child` link added before its directory exists.
 
-### Uploading the Data
+### Uploading the data
 
 `tools/publish.py` syncs `catalog/` and nothing else. That boundary keeps a scratch file out of a public bucket. Do not widen it.
 
@@ -89,11 +89,11 @@ python3 tools/upload_data.py --confirm  # upload; needs AWS credentials
 
 Its change detection compares a multipart object by size alone. Pass `--force` after you replace a file with one of the same size.
 
-### CI Checks Links Without the Bytes
+### CI checks links without the bytes
 
 A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally, so the full check runs where the bytes are.
 
-## Mode B: Maintain an Existing Catalog
+## Mode B: Maintain an existing catalog
 
 The loop is:
 
@@ -113,11 +113,11 @@ Six things matter:
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing carries no `Content-Type`, so change detection does not notice.
 * **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` at `ed23c3b` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 
-## Mode C: Contribute to Someone Else's Catalog
+## Mode C: Contribute to someone else's catalog
 
 You have a published `catalog.json` and want to correct something in it.
 
-### Find the Repository
+### Find the repository
 
 Check the root catalog's links. `vcs` names the source repository. `issues` names where to report a problem. Both are best-practice conventions, not Core requirements, so older catalogs may lack them. If the catalog uses the [STAC VCS Extension](https://github.com/stac-extensions/vcs), the `vcs` link may also carry a branch, commit, or tag.
 
@@ -127,7 +127,7 @@ curl -fsSL "$CATALOG_URL" | jq -r '.links[] | select(.rel == "vcs" or .rel == "i
 
 If those links are missing, read the catalog's `description` and `README.md`. Do not guess a repository URL from the catalog id or provider name. If you cannot identify the repository, ask the user.
 
-### Open the Pull Request
+### Open the pull request
 
 ```bash
 TMP=$(mktemp -d)
@@ -150,6 +150,6 @@ gh pr create --repo <owner>/<repo> \
 
 Run the repository's own checks before pushing. A contribution that fails the maintainer's CI costs them a round trip. Edit the source, not the generated output. A repository in the `portolan-sdi` organization lints the PR body: write `## What changed`, `## Why`, and `## Verification` in Simplified Technical English, and paste the check you ran under Verification.
 
-## Reading a Git-Backed Catalog
+## Reading a Git-backed catalog
 
 Reading one is no different from reading any other Portolan catalog. Use the `reading-portolan` skill. The repository adds context a published catalog does not: `git log` shows why metadata changed, a tag names a fixed version, and CI results show whether that version passed validation.

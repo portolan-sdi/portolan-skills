@@ -156,13 +156,13 @@ Re-extraction can be cheaper than patching and strictly better in output. It can
 
 Present the version delta, the sample diff, an estimated runtime for a full re-extraction, and anything the old catalog holds that a re-extraction would destroy. Ask which path to take.
 
-## The Spec Is Ground Truth. Rashid Checks It
+## The spec is ground truth. rashid checks it
 
-[portolan-spec](https://github.com/portolan-sdi/portolan-spec) is the standard. Every requirement carries a `PORTO-CORE-NNN` or `PORTO-FMT-NNN` id in `specs/portolan/requirements.yaml`. Rashid implements those requirements and reports `PTL-*` rule ids that cite them. `portolan check` runs rashid.
+[portolan-spec](https://github.com/portolan-sdi/portolan-spec) is the standard. Every requirement carries a `PORTO-CORE-NNN` or `PORTO-FMT-NNN` id in `specs/portolan/requirements.yaml`. rashid implements those requirements and reports `PTL-*` rule ids that cite them. `portolan check` runs rashid.
 
 Where rashid and the spec disagree, the spec decides. File the disagreement against rashid, cite the `PORTO` id, and record the workaround in `docs/conformance.md`. Do not weaken the validator, suppress findings, or add an allow-list entry to obtain a clean run. Where the CLI, `stac-check`, or your own reading disagrees with rashid and the spec is silent, rashid stands until the spec says otherwise.
 
-### Pin the Version
+### Pin the version
 
 The catalog template's `tests/test_conformance.py` runs whatever `rashid` is on `PATH`. It fails when rashid is absent or outside `>=0.1.5,<0.2.0`, and its `docs/conformance.md` says why. Install the pinned version into a repository virtualenv and pin the same version in CI.
 
@@ -170,13 +170,13 @@ Then check which one you are invoking. `portolan check` imports rashid from the 
 
 ### Declare One Schema Version
 
-Every catalog and collection MUST declare the versioned Portolan schema URI in `stac_extensions` (PORTO-CORE-006). Rashid reads the profile version from the **root** catalog and flags every object whose URI differs from it as `PTL-CNF-002`. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings, one per object. Set the version once, at the root, and make the per-collection pass match it.
+Every catalog and collection MUST declare the versioned Portolan schema URI in `stac_extensions` (PORTO-CORE-006). rashid reads the profile version from the **root** catalog and flags every object whose URI differs from it as `PTL-CNF-002`. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings, one per object. Set the version once, at the root, and make the per-collection pass match it.
 
 Take the version from the spec release you are targeting. The CLI stamps the highest schema version the installed rashid bundles, so what it writes tracks a dependency rather than your target. With portolan-cli 0.8.0 and rashid 0.1.8 that is v0.2.0, which matches spec v0.2.0. Pin the pair and check the stamped URI once. The reference generators keep the URI in a module constant so the choice is explicit.
 
-### Partitions Behind a Remote Glob Go Unchecked
+### Partitions behind a remote glob go unchecked
 
-Rashid 0.1.8 runs `PTL-DAT-006`, `PTL-DAT-007`, `PTL-DAT-008`, `PTL-DAT-012`, and `PTL-DAT-014` over every file a local relative `partition:glob` matches, and reports once per collection at `/partition:glob`. A remote or absolute glob (`s3://`, `https://`, `/data`) cannot be listed from the local tree, so those partitions go unread and the run stays clean.
+rashid 0.1.8 runs `PTL-DAT-006`, `PTL-DAT-007`, `PTL-DAT-008`, `PTL-DAT-012`, and `PTL-DAT-014` over every file a local relative `partition:glob` matches, and reports once per collection at `/partition:glob`. A remote or absolute glob (`s3://`, `https://`, `/data`) cannot be listed from the local tree, so those partitions go unread and the run stays clean.
 
 A published partitioned collection uses exactly that layout. Its data assets carry absolute `https` hrefs and its glob uses a bucket-native scheme, which PORTO-FMT-020 permits because glob expansion needs a listing. So a clean local run before upload proves nothing about the partitions.
 
@@ -196,7 +196,7 @@ The template ships `docs/conformance.md` and an `ACCEPTED` set in `tests/test_co
 
 Every Portolan Collection fails it with `'list' object has no attribute 'get'`. That is a stac-validator defect, tracked as [portolan-spec#157](https://github.com/portolan-sdi/portolan-spec/issues/157), and the template's `tests/test_stac_valid.py` and `docs/conformance.md` already tolerate that one string narrowly. The spec's own reference catalog fails identically, so no change to your catalog avoids it. Diagnosing it from scratch cost eleven turns in one session and six in the other. Do not re-diagnose it.
 
-`stac-check` also recommends a `rel: self` link. The spec agrees for the root of a catalog served from one fixed URL, which SHOULD carry an absolute `self` link (PORTO-CORE-081). Keep that link. Rashid uses it as the base for resolving absolute structural links.
+`stac-check` also recommends a `rel: self` link. The spec agrees for the root of a catalog served from one fixed URL, which SHOULD carry an absolute `self` link (PORTO-CORE-081). Keep that link. rashid uses it as the base for resolving absolute structural links.
 
 ## Styles Are Where the Value Is
 
@@ -216,7 +216,7 @@ Those styles are frequently the publisher's most considered cartography. In one 
 
 ### Four Defects No Validator Sees
 
-Rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
+rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
 
 * `fill-opacity: 0.0`, which is invisible and valid.
 * `circle-color: #ffffff` against a white background.
@@ -310,7 +310,7 @@ until grep -q 'DONE exit=' extract.log; do sleep 20; done
 
 **Deferring thumbnails leaves a rule firing.** Migration often stages thumbnails separately, through `portolan-thumbnails`, so `portolan add --no-thumbnails` is the common call. That leaves `PTL-VIZ-001` failing until the images land. Expect it in the interim baseline rather than chasing it. Pair `--no-thumbnails` with `check.disabled` in `.portolan/config.yaml` only for a catalog that will never ship thumbnails at all.
 
-### Apply What Add Cannot Derive
+### Apply what add cannot derive
 
 `portolan add` regenerates `collection.json`. Since portolan-cli 0.8.0 a collection's own `metadata.yaml` is authoritative for its title, description, license, and providers, and an ancestor's `metadata.yaml` only fills a field the collection still lacks. A re-add no longer replaces a title a maintainer set on the collection, and a catalog title never becomes a collection title.
 
@@ -356,7 +356,7 @@ Two fields the generator must leave alone. It keeps the root's absolute `self` l
 | A layer failed extraction in the old catalog | Read the report, check whether the toolchain has since fixed it |
 | Collection directory exists but is unlinked | Decide explicitly whether to link or remove it. Do not leave it stranded |
 | Validator passes on first run | Plant a violation and confirm it fails before believing the pass |
-| Rashid and the spec disagree | The spec decides. File the issue against rashid with the `PORTO` id, and record the workaround in `docs/conformance.md` |
+| rashid and the spec disagree | The spec decides. File the issue against rashid with the `PORTO` id, and record the workaround in `docs/conformance.md` |
 | A finding cannot be fixed | Add a row to `docs/conformance.md` with a tracking issue, then the id to `ACCEPTED`. Never one without the other |
 | `stac-check` crashes on a Collection | Expected. The template's gate tolerates that one string. Do not re-diagnose it |
 | Style renders blank | Check opacity, colour against background, glyphs, and `match` label types before blaming the renderer |

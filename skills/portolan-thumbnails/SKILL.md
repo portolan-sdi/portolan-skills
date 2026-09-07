@@ -39,7 +39,7 @@ and a row of cards that all look alike. Rewriting the bbox is reframing, not
 distortion. Nothing gets stretched. `specs/best-practices/conversion-defaults.md`
 describes the CLI's own thumbnail as guidance, not conformance.
 
-## Step 1: Read the Collection
+## Step 1: Read the collection
 
 `read_collection.py` reads the signals from `collection.json` by role and by link
 relation, never by file name. Styles are assets with the `style` role, and the
@@ -72,7 +72,7 @@ python3 "$SKILL/scripts/frame.py" \
 Treat `center` as a hint. tippecanoe sometimes writes a bbox corner rather than a
 dense cluster. Confirm it with a feature count before you build a window around it.
 
-## Step 2: Choose a Strategy
+## Step 2: Choose a strategy
 
 **A, full extent.** Frame the whole bbox. Right for boundaries, districts, wards,
 neighborhoods, watersheds, city limits, and anything with a small feature count.
@@ -94,7 +94,7 @@ These are defaults, not rules. Override them when the data says otherwise.
 `fill` and `aspect` come from Step 3. The last two rows mean you run `frame.py`
 first and then reconsider.
 
-## Step 3: Compute the Bbox
+## Step 3: Compute the bbox
 
 `frame.py` reshapes a bbox to 3:2 in Web Mercator and reports `fill`, `aspect`,
 and the effective zoom.
@@ -183,7 +183,7 @@ bash "$SKILL/scripts/start_server.sh"
 # health=200
 ```
 
-### Render One Collection
+### Render one collection
 
 `render_one.sh` calls `read_collection.py`, builds three styles with
 `buildstyle.py`, posts them to `/clip`, and runs Gate 1. It writes to the path
@@ -206,7 +206,7 @@ line. Without it MapLibre assumes the source goes to zoom 22, asks for a tile th
 archive does not contain, and draws nothing. That produces an all-basemap
 thumbnail.
 
-## Step 5: Check the Result
+## Step 5: Check the result
 
 Two gates. Both run before anything is pushed.
 
@@ -255,7 +255,7 @@ Legibility problems that survive reframing belong to the style, not to this skil
 `specs/best-practices/styling.md` covers how to vary default styles across a
 catalog.
 
-## Style Defects the Validator Misses
+## Style defects the validator misses
 
 Each of these reaches this skill as a failed request or a blank image, never as a
 validator finding.
@@ -285,7 +285,7 @@ Set `pmtiles.max_zoom` in `.portolan/config.yaml` and regenerate.
 portolan add publico_arbolado/ --force-pmtiles
 ```
 
-## Step 6: Work Through the Catalog
+## Step 6: Work through the catalog
 
 Cards are seen side by side, so judge them as a set. Aim for roughly a third
 full-extent and the rest zoomed at varying depths. Never put two thumbnails on the
@@ -298,7 +298,7 @@ publico_arbolado	B	-60.603932,-33.906046,-60.559986,-33.881728	15.0	0	pass
 publico_barrios	A	-60.651220,-33.935211,-60.495382,-33.848971	13.17	-	pass
 ```
 
-## Step 7: Refresh Checksums and Push
+## Step 7: Refresh checksums and push
 
 The thumbnail asset carries `file:size` and `file:checksum`. They MUST match the
 bytes the `href` resolves to (PORTO-CORE-030). A re-render changes the bytes, so a

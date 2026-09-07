@@ -11,7 +11,7 @@ A Portolan catalog is a STAC catalog served as static files from object storage.
 
 The [Portolan specification](https://github.com/portolan-sdi/portolan-spec) is ground truth. Read `specs/portolan/core.md` and `specs/portolan/formats.md` at tag v0.2.0 when this skill and a catalog disagree. Rule ids such as `PORTO-CORE-061` point into `specs/portolan/requirements.yaml`.
 
-## Step 1: Detect the Environment
+## Step 1: Detect the environment
 
 Check what is installed before you suggest a tool.
 
@@ -37,7 +37,7 @@ If nothing is installed, explain the options and offer to guide an install. Resp
 
 Install a current DuckDB with the `spatial` extension.
 
-## Step 2: Read the Metadata
+## Step 2: Read the metadata
 
 ### Catalog Layout
 
@@ -59,7 +59,7 @@ catalog-root/
 
 Every catalog and every collection carries an `AGENTS.md` and a `README.md` (PORTO-CORE-061, PORTO-CORE-062). A `versions.json` beside them is a CLI artifact, not part of the specification. Ignore it when you read data. There is no `llms.txt` in the specification.
 
-### Crawl the Catalog
+### Crawl the catalog
 
 Start at `catalog.json`. Follow every link with `rel: child`. A child with `"type": "Catalog"` is a sub-catalog, so recurse into it. A child with `"type": "Collection"` is a dataset. Build the full inventory before you answer a question.
 
@@ -68,7 +68,7 @@ BASE=https://example.com/catalog
 curl -s $BASE/catalog.json | jq -r '.links[] | select(.rel=="child") | .href'
 ```
 
-### Read AGENTS.md First
+### Read AGENTS.md first
 
 Every collection links its `AGENTS.md` with `rel: agents` and its `README.md` with `rel: describedby`. Read `AGENTS.md` before you write a query. It names the join keys, the coordinate system, the useful aggregations, and the data quality traps. The README carries the schema table and the provenance.
 
@@ -105,7 +105,7 @@ What each field tells you:
 - `table:columns` documents the columns with names, types, and descriptions. Read it before `DESCRIBE`.
 - `partition:glob` is present only on a partitioned collection. See Step 4.
 
-### Find Assets by Role
+### Find assets by role
 
 Asset keys carry no meaning. Filter on `roles` (PORTO-CORE-027). Every asset carries a `type` and at least one role (PORTO-CORE-025).
 
@@ -125,14 +125,14 @@ curl -s $COLL/collection.json \
 
 Hrefs are relative to the file that holds them. An absolute asset href uses `https` (PORTO-CORE-023). An asset may add an `s3://` or `gs://` URL under `alternate` (PORTO-CORE-024). Use the `https` href with DuckDB unless you have bucket credentials. Do not rewrite an `https` URL into `s3://` by hand.
 
-### Where the Data Lives
+### Where the data lives
 
 - A single-file vector, tabular, or single-COG collection puts its `data` asset on the collection (PORTO-CORE-017).
 - A raster collection with several scenes puts one COG on each item. Items live at `{item_id}/{item_id}.json`. The collection should also publish `items.parquet` with the `collection-mirror` role (PORTO-FMT-040, PORTO-FMT-041). Query that file to find scenes instead of fetching every item JSON.
 - A partitioned vector collection puts its files behind `partition:glob` (PORTO-FMT-019). It may also list partitions as items.
 - A tabular collection is a Parquet `data` asset with no geometry column (PORTO-FMT-034). Its `extent.spatial.bbox` is the area the table refers to, not a footprint. When geometry and attributes live in separate files, the README documents the join columns and carries a working join example (PORTO-FMT-038). Copy that example.
 
-## Step 3: Query Vectors and Tables with DuckDB
+## Step 3: Query vectors and tables with DuckDB
 
 ```sql
 INSTALL spatial; LOAD spatial;
@@ -141,7 +141,7 @@ INSTALL httpfs; LOAD httpfs;
 
 For a private `s3://` bucket, set `s3_region`, `s3_access_key_id`, and `s3_secret_access_key` before you read.
 
-### Explore Before You Query
+### Explore before you query
 
 ```sql
 -- Schema. Compare with table:columns.
@@ -157,7 +157,7 @@ SELECT * FROM read_parquet('https://.../data.parquet') LIMIT 10;
 SELECT DISTINCT column_name FROM read_parquet('https://.../data.parquet') LIMIT 20;
 ```
 
-### Use the File Layout
+### Use the file layout
 
 Portolan GeoParquet follows rules that make remote queries cheap:
 
@@ -188,7 +188,7 @@ WHERE ST_Intersects(geometry, ST_MakeEnvelope(5.0, 52.0, 6.0, 53.0));
 
 Without a `bbox` column, use `ST_Intersects` directly. DuckDB still prunes on native statistics where the file has them.
 
-### Common Patterns
+### Common patterns
 
 ```sql
 -- Attribute filter and aggregation
@@ -210,7 +210,7 @@ JOIN read_parquet('https://.../regions.parquet') r
 
 Check the CRS in `DESCRIBE` or in the collection metadata before you trust an area or a distance. A projected CRS gives meters. EPSG:4326 gives degrees.
 
-### Cross-Collection Joins
+### Cross-collection joins
 
 Collections in one catalog share a base URL, so a join across them is one query. Read each collection's `AGENTS.md` for the join key first. An attribute join on a documented key beats a spatial join.
 
@@ -237,7 +237,7 @@ TO 'subset.geojson' WITH (FORMAT GDAL, DRIVER 'GeoJSON');
 
 For other formats use `ogr2ogr`. It reads remote files through `/vsicurl/https://...`, `/vsis3/bucket/...`, and `/vsigs/bucket/...`. `gpio inspect data.parquet` and `gpio inspect stats data.parquet` give a quick summary without SQL. `gpio check all data.parquet` reports whether a file follows the layout rules above.
 
-## Step 4: Partitioned Collections
+## Step 4: Partitioned collections
 
 A collection with `partition:glob` spreads its rows over several files. The glob is the bulk-access path (PORTO-FMT-019). Copy it as written. Do not build your own pattern from the asset hrefs, because the scheme decides the directory layout.
 
@@ -267,7 +267,7 @@ SELECT * FROM read_parquet(
 
 For `s3://`, set the region and, for a private bucket, the keys. Every partition file shares one schema (PORTO-FMT-021), so the glob queries as one table. When the partitions are also items, `items.parquet` or the item JSONs give each partition's bbox.
 
-## Step 5: Read Rasters
+## Step 5: Read rasters
 
 A single COG is a collection `data` asset. A multi-scene collection has one item per scene. Query `items.parquet` (role `collection-mirror`) with DuckDB to select scenes by bbox or datetime, then open the COG href from the chosen rows.
 
@@ -290,7 +290,7 @@ For conversion, `gdal_translate` and `gdalwarp` read the same `/vsicurl/` URLs a
 
 Use MapLibre GL JS with the PMTiles protocol. Do not export GeoJSON or inline data for a web map. The collection already ships tiles built for the browser.
 
-### Find the Tiles
+### Find the tiles
 
 PMTiles is a collection-level link with `rel: pmtiles` and type `application/vnd.pmtiles` (PORTO-FMT-011). Its `pmtiles:layers` array names the layers a client shows by default (PORTO-FMT-012). Those names are the `source-layer` values for MapLibre. Do not guess the layer name from the file name. An asset with the `visual` role may carry the same file when the publisher also offers it for download.
 
@@ -301,7 +301,7 @@ curl -s $COLL/collection.json \
 
 `pmtiles show data.pmtiles --metadata` prints the full layer list from a local or remote archive.
 
-### Use the Shipped Style
+### Use the shipped style
 
 A collection with PMTiles carries at least one style asset (PORTO-FMT-014). Filter assets on the `style` role (PORTO-CORE-069). When there are several, exactly one also carries `default` (PORTO-CORE-070). Each style is a complete MapLibre GL style, version 8, with media type `application/vnd.mapbox.style+json` (PORTO-FMT-015). Its `sources.data.url` is a path relative to the `styles/` directory, usually `../{name}.pmtiles`. Resolve it against the style URL before you load it.
 
@@ -331,7 +331,7 @@ MapLibre expressions style by attribute:
 
 Use deck.gl only for 3D extrusion or analytical overlays that MapLibre cannot draw. Its `MVTLayer` reads the same PMTiles file. For a COG on a web map you need a tile server. Rendering rasters in the browser is out of scope for this skill.
 
-## Workflow: Answer a Question About a Catalog
+## Workflow: Answer a question about a catalog
 
 1. Crawl `catalog.json` and every sub-catalog. List the collections.
 2. Read the `AGENTS.md` of each relevant collection.

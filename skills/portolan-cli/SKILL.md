@@ -18,7 +18,7 @@ uv tool install portolan-cli
 portolan --version
 ```
 
-## What the CLI Writes
+## What the CLI writes
 
 `portolan init` writes a root `catalog.json`, `AGENTS.md`, `README.md`, `versions.json`, and `.portolan/config.yaml` plus `.portolan/metadata.yaml`. The root declares the v0.2.0 schema URI in `stac_extensions`. That URI is the only signal of the spec version (PORTO-CORE-006). Its links are `root`, `agents`, and `describedby`. It writes no `self` link. Add an absolute `self` link at publish time (PORTO-CORE-081).
 
@@ -44,7 +44,7 @@ A single file is a collection-level asset with no item (PORTO-CORE-017). A parti
 
 Structural links stay relative, so the catalog is portable.
 
-## Which Command
+## Which command
 
 | Task | Command |
 |---|---|
