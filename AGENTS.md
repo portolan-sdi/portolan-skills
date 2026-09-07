@@ -83,8 +83,8 @@ uv run scripts/check_drift.py
 
 Pre-commit runs it with `--offline`. The `Drift` workflow runs it on every pull request and once a week. The weekly run fails when a pin lags its upstream and keeps one tracking issue open.
 
-Each `SKILL.md` carries `<!-- drift: depends-on: ... -->` on line 6, which names the upstreams it states facts about. There is no `last-verified` date. `git log pins.toml` records when a pin last moved.
+Each `SKILL.md` has `<!-- drift: depends-on: ... -->` on line 6. That comment lists the upstreams the skill states facts about. There is no `last-verified` date. `git log pins.toml` records when a pin last moved.
 
-A skill restates nothing that `portolan <cmd> --help`, the spec, or rashid output can answer. Cite a spec rule by its id, such as `PORTO-CORE-081`, instead of paraphrasing it. To show a wrong command on purpose, put `<!-- drift-skip: <reason> -->` on the line before the fence.
+A skill restates nothing that `portolan <cmd> --help`, the spec, or rashid output can answer. Cite a spec rule by its id, such as `PORTO-CORE-081`. Do not paraphrase the rule. To show a wrong command on purpose, put `<!-- drift-skip: <reason> -->` on the line before the fence.
 
-To move a pin: edit `pins.toml`, run the checker, and fix every finding in the same pull request.
+To move a pin, edit `pins.toml`. Then run the checker and fix every finding in the same pull request.

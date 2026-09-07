@@ -1,6 +1,6 @@
 ---
 name: reading-portolan
-description: Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers reading AGENTS.md and STAC metadata, finding assets by role, querying GeoParquet and Parquet with DuckDB, reading COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
+description: Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers AGENTS.md and STAC metadata, assets by role, DuckDB queries over GeoParquet and Parquet, COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
 ---
 
 <!-- drift: depends-on: portolan-spec -->
@@ -57,7 +57,7 @@ catalog-root/
     └── {item_id}/{item_id}.json # one directory per item, when items exist
 ```
 
-Every catalog and every collection carries an `AGENTS.md` and a `README.md` (PORTO-CORE-061, PORTO-CORE-062). A `versions.json` beside them is a CLI artifact, not part of the specification. Ignore it when you read data. There is no `llms.txt` in the specification.
+Each catalog and each collection includes an `AGENTS.md` and a `README.md` (PORTO-CORE-061, PORTO-CORE-062). A `versions.json` beside them is a CLI artifact, not part of the specification. Ignore it when you read data. There is no `llms.txt` in the specification.
 
 ### Crawl the catalog
 
@@ -70,7 +70,7 @@ curl -s $BASE/catalog.json | jq -r '.links[] | select(.rel=="child") | .href'
 
 ### Read AGENTS.md first
 
-Every collection links its `AGENTS.md` with `rel: agents` and its `README.md` with `rel: describedby`. Read `AGENTS.md` before you write a query. It names the join keys, the coordinate system, the useful aggregations, and the data quality traps. The README carries the schema table and the provenance.
+Every collection links its `AGENTS.md` with `rel: agents` and its `README.md` with `rel: describedby`. Read `AGENTS.md` before you write a query. It lists the join keys, the coordinate system, the useful aggregations, and the data quality traps. The README documents the schema and the provenance.
 
 ```bash
 COLL=$BASE/collection-id
@@ -96,18 +96,18 @@ curl -s $COLL/collection.json | jq '{
 }'
 ```
 
-What each field tells you:
+Each field reports the following:
 
 - `stac_extensions` carries `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json`. That URI is the only signal of the specification version (PORTO-CORE-006).
 - `license` is an SPDX identifier, or `other` with a `rel: license` link (PORTO-CORE-058, PORTO-CORE-059). Report it before you redistribute anything.
 - `providers` lists at least one `producer` and exactly one `host`, last (PORTO-CORE-047). When the producer and the host are the same organization, the catalog is official. When they differ, the catalog is a mirror.
-- A mirror carries a `via` link (`text/html`) to the original source (PORTO-CORE-053). It carries a `canonical` link when the source publishes its own STAC (PORTO-CORE-054). It sets top-level `updated` to the last sync time (PORTO-CORE-057). Compare `updated` with the source when freshness matters.
+- A mirror has a `via` link (`text/html`) to the original source (PORTO-CORE-053). It has a `canonical` link when the source publishes its own STAC (PORTO-CORE-054). It sets top-level `updated` to the last sync time (PORTO-CORE-057). Compare `updated` with the source when freshness matters.
 - `table:columns` documents the columns with names, types, and descriptions. Read it before `DESCRIBE`.
 - `partition:glob` is present only on a partitioned collection. See Step 4.
 
 ### Find assets by role
 
-Asset keys carry no meaning. Filter on `roles` (PORTO-CORE-027). Every asset carries a `type` and at least one role (PORTO-CORE-025).
+An asset key means nothing. Filter on `roles` (PORTO-CORE-027). Each asset has a `type` and at least one role (PORTO-CORE-025).
 
 | Role | What it is | Media type |
 |---|---|---|
@@ -125,7 +125,7 @@ curl -s $COLL/collection.json \
 
 Hrefs are relative to the file that holds them. An absolute asset href uses `https` (PORTO-CORE-023). An asset may add an `s3://` or `gs://` URL under `alternate` (PORTO-CORE-024). Use the `https` href with DuckDB unless you have bucket credentials. Do not rewrite an `https` URL into `s3://` by hand.
 
-### Where the data lives
+### Asset hrefs and access paths
 
 - A single-file vector, tabular, or single-COG collection puts its `data` asset on the collection (PORTO-CORE-017).
 - A raster collection with several scenes puts one COG on each item. Items live at `{item_id}/{item_id}.json`. The collection should also publish `items.parquet` with the `collection-mirror` role (PORTO-FMT-040, PORTO-FMT-041). Query that file to find scenes instead of fetching every item JSON.
@@ -162,7 +162,7 @@ SELECT DISTINCT column_name FROM read_parquet('https://.../data.parquet') LIMIT 
 Portolan GeoParquet follows rules that make remote queries cheap:
 
 - Rows are spatially ordered (PORTO-FMT-006). Hilbert order is common, but it is one scheme among several. Do not assume a specific curve.
-- Every file carries per-row-group spatial statistics (PORTO-FMT-007). GeoParquet 1.1 files carry a `bbox` covering column with min and max statistics. GeoParquet 2.x files may carry native geometry statistics and no `bbox` column. Check `DESCRIBE` before you reference `bbox`.
+- Each file has per-row-group spatial statistics (PORTO-FMT-007). A GeoParquet 1.1 file has a `bbox` covering column with min and max statistics. A GeoParquet 2.x file may have native geometry statistics and no `bbox` column. Check `DESCRIBE` before you reference `bbox`.
 - Row groups hold at most 150,000 rows (PORTO-FMT-009). A spatial or attribute filter skips whole groups from metadata.
 - Files are compressed, `zstd` by default.
 
@@ -212,7 +212,7 @@ Check the CRS in `DESCRIBE` or in the collection metadata before you trust an ar
 
 ### Cross-collection joins
 
-Collections in one catalog share a base URL, so a join across them is one query. Read each collection's `AGENTS.md` for the join key first. An attribute join on a documented key beats a spatial join.
+Collections in one catalog share a base URL, so a join across them is one query. Read each collection's `AGENTS.md` for the join key first. An attribute join on a documented key runs faster than a spatial join.
 
 ```sql
 -- Which park holds the most buildings?
@@ -235,11 +235,11 @@ COPY (SELECT * FROM read_parquet('https://.../data.parquet') WHERE ...)
 TO 'subset.geojson' WITH (FORMAT GDAL, DRIVER 'GeoJSON');
 ```
 
-For other formats use `ogr2ogr`. It reads remote files through `/vsicurl/https://...`, `/vsis3/bucket/...`, and `/vsigs/bucket/...`. `gpio inspect data.parquet` and `gpio inspect stats data.parquet` give a quick summary without SQL. `gpio check all data.parquet` reports whether a file follows the layout rules above.
+For other formats use `ogr2ogr`. It reads remote files through `/vsicurl/https://...`, `/vsis3/bucket/...`, and `/vsigs/bucket/...`. `gpio inspect data.parquet` and `gpio inspect stats data.parquet` summarize a file without SQL. `gpio check all data.parquet` reports whether a file follows the layout rules above.
 
 ## Step 4: partitioned collections
 
-A collection with `partition:glob` spreads its rows over several files. The glob is the bulk-access path (PORTO-FMT-019). Copy it as written. Do not build your own pattern from the asset hrefs, because the scheme decides the directory layout.
+A collection with `partition:glob` spreads its rows over several files. The glob is the bulk-access path (PORTO-FMT-019). Copy it as written. Do not build your own pattern from the asset hrefs, because the scheme determines the directory layout.
 
 The glob may use `s3://` or `gs://` even though asset hrefs use `https` (PORTO-FMT-020). Glob expansion needs a bucket listing, and plain `https` cannot list. DuckDB does not expand an `https` glob.
 
@@ -269,9 +269,9 @@ For `s3://`, set the region and, for a private bucket, the keys. Every partition
 
 ## Step 5: read rasters
 
-A single COG is a collection `data` asset. A multi-scene collection has one item per scene. Query `items.parquet` (role `collection-mirror`) with DuckDB to select scenes by bbox or datetime, then open the COG href from the chosen rows.
+One COG is a collection `data` asset. A multi-scene collection has one item per scene. Query `items.parquet` (role `collection-mirror`) with DuckDB to select scenes by bbox or datetime, then open the COG href from the chosen rows.
 
-Every band of a Portolan COG carries an embedded minimum, maximum, mean, and standard deviation (PORTO-FMT-027). They sit in the leading header block, so one range request returns them. Read them from the tags. Do not compute statistics from pixels.
+Each band of a Portolan COG has an embedded minimum, maximum, mean, and standard deviation (PORTO-FMT-027). They are in the leading header block, so one range request returns them. Read them from the tags. Do not compute statistics from pixels.
 
 ```python
 import rasterio
@@ -288,11 +288,11 @@ For conversion, `gdal_translate` and `gdalwarp` read the same `/vsicurl/` URLs a
 
 ## Step 6: visualize
 
-Use MapLibre GL JS with the PMTiles protocol. Do not export GeoJSON or inline data for a web map. The collection already ships tiles built for the browser.
+Use MapLibre GL JS with the PMTiles protocol. Do not export GeoJSON or inline data for a web map. The collection already provides tiles built for the browser.
 
 ### Find the tiles
 
-PMTiles is a collection-level link with `rel: pmtiles` and type `application/vnd.pmtiles` (PORTO-FMT-011). Its `pmtiles:layers` array names the layers a client shows by default (PORTO-FMT-012). Those names are the `source-layer` values for MapLibre. Do not guess the layer name from the file name. An asset with the `visual` role may carry the same file when the publisher also offers it for download.
+PMTiles is a collection-level link with `rel: pmtiles` and type `application/vnd.pmtiles` (PORTO-FMT-011). Its `pmtiles:layers` array names the layers a client shows by default (PORTO-FMT-012). Those names are the `source-layer` values for MapLibre. Do not guess the layer name from the file name. An asset with the `visual` role may use the same file when the publisher also offers it for download.
 
 ```bash
 curl -s $COLL/collection.json \
@@ -301,7 +301,7 @@ curl -s $COLL/collection.json \
 
 `pmtiles show data.pmtiles --metadata` prints the full layer list from a local or remote archive.
 
-### Use the shipped style
+### Use the published style
 
 A collection with PMTiles carries at least one style asset (PORTO-FMT-014). Filter assets on the `style` role (PORTO-CORE-069). When there are several, exactly one also carries `default` (PORTO-CORE-070). Each style is a complete MapLibre GL style, version 8, with media type `application/vnd.mapbox.style+json` (PORTO-FMT-015). Its `sources.data.url` is a path relative to the `styles/` directory, usually `../{name}.pmtiles`. Resolve it against the style URL before you load it.
 
@@ -312,12 +312,12 @@ curl -s $COLL/collection.json \
 
 Reference files in this skill:
 
-- `reference/style-default.json` shows the shape of a shipped style.
-- `reference/map-style.html` loads a style asset, resolves its PMTiles URL, and switches styles.
-- `reference/map-inline.html` builds a style inline when the collection ships none. It takes the PMTiles URL and the `source-layer` from the `rel: pmtiles` link.
+- `reference/style-default.json` shows the shape of a published style.
+- `reference/map-style.html` loads a style asset and resolves its PMTiles URL. It also switches between styles.
+- `reference/map-inline.html` builds a style inline when the collection provides none. It takes the PMTiles URL and the `source-layer` from the `rel: pmtiles` link.
 - `reference/map-multi.js` draws two collections on one map.
 
-Read the shipped style even when you build your own map. It holds the right `source-layer`, a palette matched to the attribute values, and the `match` and `filter` expressions that show which values exist.
+Read the published style even when you build your own map. It has the right `source-layer`, a palette matched to the attribute values, and the `match` and `filter` expressions that show which values exist.
 
 ### Data-Driven Styling
 

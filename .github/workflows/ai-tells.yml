@@ -1,0 +1,57 @@
+# Local workflow. It is not synced from portolan-ops because it runs a
+# repo-local style. See portolan-ops norms/ci.md.
+#
+# .github/workflows/vale.yml checks the org prose rules. That workflow calls
+# the shared reusable-vale.yml, which passes `--config ../ops/.vale.ini`, so
+# a calling repo cannot add a style to it. This job runs the second gate:
+# the ai-tells style named in this repo's own .vale.ini.
+name: AI tells
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - "README.md"
+      - "AGENTS.md"
+      - ".vale.ini"
+      - ".github/workflows/ai-tells.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  VALE_VERSION: 3.19.0
+
+jobs:
+  ai-tells:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install Vale
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "v${VALE_VERSION}" \
+            --repo vale-cli/vale \
+            --pattern "vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            --output vale.tar.gz
+          tar xzf vale.tar.gz vale
+          sudo install -m 0755 vale /usr/local/bin/vale
+          vale --version
+
+      - name: Fetch the pinned style package
+        run: vale sync
+
+      - name: Check the prose
+        run: vale --output=line skills README.md AGENTS.md

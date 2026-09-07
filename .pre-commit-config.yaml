@@ -13,3 +13,9 @@ repos:
         language: system
         pass_filenames: false
         files: ^skills/.*\.md$|^pins\.toml$|^scripts/check_drift\.py$
+      - id: ai-tells
+        name: Check the prose against the ai-tells style
+        entry: scripts/vale_ai_tells.sh
+        language: system
+        pass_filenames: false
+        files: ^skills/.*\.md$|^README\.md$|^AGENTS\.md$|^\.vale\.ini$

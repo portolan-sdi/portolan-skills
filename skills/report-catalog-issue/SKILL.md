@@ -7,13 +7,20 @@ description: Report a problem with a catalog registered in the Portolan registry
 
 # Report a Problem with a Registered Catalog
 
-You found something wrong with a Portolan catalog while reading it: a license that misdescribes the data, a collection whose schema contradicts its items, an asset that does not open, a description that documents something else. This skill files that report as a catalog feedback issue on [portolan-registry](https://github.com/portolan-sdi/portolan-registry). The registry mails the person who registered the catalog.
+You found something wrong with a Portolan catalog while reading it. The problem may be one of these:
+
+- a license that misdescribes the data
+- a collection whose schema contradicts its items
+- an asset that does not open
+- a description that documents something else
+
+This skill files that report as a catalog feedback issue on [portolan-registry](https://github.com/portolan-sdi/portolan-registry). The registry mails the person who registered the catalog.
 
 Use it for problems with the data a catalog serves. A problem with the registry itself, its crawl, or its export is an ordinary bug report on the same repo.
 
 ## Step 1: Resolve the catalog against the registry
 
-Only a registered catalog can be reported. The registry export lists every one. Each child link carries the registry id.
+Only a registered catalog can be reported. The registry export lists every one. Each child link includes the registry id.
 
 ```bash
 # Accepts either the registry id or the catalog.json URL
@@ -40,7 +47,7 @@ If the script exits 1, stop. The catalog is not in the registry, so there is nob
 
 The report is worth nothing without evidence. Run a command against the live catalog and keep both the command and its output.
 
-The validator is the first source of evidence when you hold a local copy of the catalog. It ties each finding to a spec rule id, which the catalog owner can look up. `rashid check` takes a directory, not a URL. `portolan check` gives the same evidence inside a catalog the CLI manages.
+The validator is the first source of evidence when you hold a local copy of the catalog. It ties each finding to a spec rule id, which the catalog owner can look up. `rashid check` takes a directory rather than a URL. `portolan check` gives the same evidence inside a catalog the CLI manages.
 
 ```bash
 uvx --from 'rashid>=0.1.8,<0.2.0' rashid check ./catalog --summary
@@ -96,7 +103,7 @@ curl 8.5.0
 
 Kind is one of: Data quality, Schema, Accessibility, Documentation, Other. A missing or wrong metadata field is Schema. A wrong README or description is Documentation. Data quality is for the values in the data files. Accessibility is for an asset that does not open or a host that fails range requests.
 
-One report, one problem. Two problems are two issues. The **How you hit it** block is never empty and never a description of output.
+Report one problem per issue. File a second issue for a second problem. Fill the **How you hit it** block with the command you ran and its output. Do not describe the output in prose.
 
 ## Step 4: Get approval, then file
 
@@ -110,7 +117,7 @@ gh issue create \
   --body-file body.md
 ```
 
-The title names the catalog first, then the problem in a few words.
+The title states the catalog first, then the problem in a few words.
 
 ## Step 5: report back
 

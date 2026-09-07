@@ -11,7 +11,7 @@ The skills track the versions of portolan-cli, rashid, the specification, and th
 
 ### `git-backed-catalog`
 
-Create, maintain, or contribute to a Portolan catalog whose metadata lives in a git repository, with CI validating every change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
+Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
 
 ### `portolan-bootstrap`
 
@@ -23,15 +23,15 @@ Use when publishing, managing, or converting cloud-native geospatial data catalo
 
 ### `portolan-migrate`
 
-Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and falls short of the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
+Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and does not meet the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
 
 ### `portolan-thumbnails`
 
-Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style asset server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, gates each image on an automated blank probe plus a visual review, then refreshes file:size and file:checksum with portolan check --fix. Requires Node.js 24.12 or newer.
+Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, accepts an image only after an automated blank probe and a visual review, then refreshes file:size and file:checksum with portolan check and its fix flag. Requires Node.js 24.12 or newer.
 
 ### `reading-portolan`
 
-Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers reading AGENTS.md and STAC metadata, finding assets by role, querying GeoParquet and Parquet with DuckDB, reading COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
+Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers AGENTS.md and STAC metadata, assets by role, DuckDB queries over GeoParquet and Parquet, COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
 
 ### `register-catalog`
 
