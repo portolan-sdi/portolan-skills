@@ -3,11 +3,19 @@
 From pergamino-ide-catalog (tools/generate/apply_metadata.py). Generalized as
 a reference; edit the constants under "What a new catalog must change".
 
-Run this LAST, after every `add` invocation. `add` regenerates collection.json
-and, through the hierarchical metadata.yaml resolution, overwrites each
-collection's title with the catalog root's title. It also rewrites
-stac_extensions with the schema version the CLI ships rather than the one the
-current spec release defines.
+Run this LAST, after every `add` invocation. Since portolan-cli 0.8.0 a
+collection's own metadata.yaml is authoritative for title, description,
+license, and providers, and an ancestor's metadata.yaml only fills a field the
+collection still lacks. What `add` cannot derive is metadata that lives outside
+the tree: titles and abstracts harvested from the upstream service, originators
+named in a free-text attribution field, and hand-written text for layers whose
+upstream abstract is useless. This script applies those, and pins the Portolan
+schema URI to the spec release the catalog targets.
+
+Two fields it leaves alone. The root's absolute `self` link stays, because a
+catalog served from one fixed URL SHOULD carry one (PORTO-CORE-081). `updated`
+stays, because a mirror sets it to the time of the last sync from source
+(PORTO-CORE-057), and a metadata re-apply is not a sync.
 
 Everything here is idempotent and derived from the harvested upstream metadata,
 so it can be re-run after any add.
@@ -16,7 +24,6 @@ so it can be re-run after any add.
 import json
 import os
 import sys
-from datetime import datetime, timezone
 
 DST = sys.argv[1]
 META = json.load(open(sys.argv[2], encoding="utf-8"))
@@ -93,10 +100,6 @@ ROOT_LINKS = (
 # --------------------------------------------------------------------------
 
 
-def now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def leaf_name(group, layer):
     prefix = group.split("-")[0] + "_"
     if layer.startswith(prefix) and len(layer) > len(prefix):
@@ -165,7 +168,6 @@ def main():
             col["title"] = title_for(layer)
             col["description"] = description_for(layer, col.get("description", ""))
             col["providers"] = providers_for(layer)
-            col["updated"] = now()
 
             ext = [e for e in col.get("stac_extensions", []) if "portolan" not in e]
             col["stac_extensions"] = sorted(set(ext + [SCHEMA]))
@@ -198,7 +200,6 @@ def main():
                        if l.get("rel") in ("agents", "describedby")), len(gcat["links"]))
         gcat["links"][insert:insert] = child_links
         gcat["stac_extensions"] = [SCHEMA]
-        gcat["updated"] = now()
         json.dump(gcat, open(gcat_path, "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
 
@@ -210,8 +211,9 @@ def main():
     root["stac_extensions"] = [SCHEMA]
     root["id"] = ROOT_ID
     root["title"] = ROOT_TITLE
-    root["updated"] = now()
-    root["links"] = [l for l in root.get("links", []) if l.get("rel") != "self"]
+    # The root keeps its absolute `self` link (PORTO-CORE-081) and its
+    # `updated` value (PORTO-CORE-057). Only missing links are added.
+    root["links"] = list(root.get("links", []))
     have = {(l.get("rel"), l.get("href")) for l in root["links"]}
     for extra in ROOT_LINKS:
         if (extra["rel"], extra["href"]) not in have:

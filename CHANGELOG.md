@@ -3,6 +3,54 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.3.0 - 2026-09-07
+
+This release rewrites every skill against specification v0.2.0, portolan-cli
+0.8.0, and rashid 0.1.8. It adds a checker that keeps them there.
+
+### Added
+
+- `pins.toml` names the upstream versions the skills describe: portolan-cli,
+  rashid, the specification tag, the catalog template, and the registry.
+- `scripts/check_drift.py` checks every `portolan`, `rashid`, and `gh` command
+  in the skills against the pinned tools, every `PORTO-*` id against the spec
+  manifest, every `PTL-*` id against the rashid registry, every cited spec
+  path against the spec tree, and every sample issue or PR body against the
+  writing check. It runs in pre-commit, on every pull request, and weekly.
+  The weekly run also fails when a pin lags its upstream.
+- `tests/` covers the checker without network access.
+
+### Changed
+
+- Every skill carries a `drift: depends-on` header instead of a hand-typed
+  `last-verified` date.
+- `portolan-cli` drops its command reference. Agents run `portolan <cmd>
+  --help`. The skill keeps the layout the CLI writes, the command to reach for,
+  and the facts that trip agents (#44).
+- `sourcecoop` drops its generated command reference and its styles section.
+  Every `init` carries `--license`. Mirrors carry `via` and `updated` (#42).
+- `reading-portolan` absorbs `portolan-consume`. It reads `AGENTS.md`, finds
+  assets by role, reads the `rel: pmtiles` link, and copies `partition:glob`
+  as written (#39, #40).
+- `portolan-bootstrap` names `providers`, `via`, and `updated` for mirrors,
+  drops `llms.txt`, and adds the multi-scene raster layout (#43, #26).
+- `git-backed-catalog` points at the template's `upload_data.py` and
+  `CI_LIGHT`, tells the reader to declare the v0.2.0 schema URI and raise the
+  gate's rashid floor, and states the item rule (#46, #26).
+- `portolan-migrate` puts the spec above rashid and drops three warnings that
+  rashid 0.1.7 and portolan-cli 0.8.0 made false. `apply_metadata.py` keeps
+  the root `self` link and stops re-stamping `updated` (#45).
+- `portolan-thumbnails` finds the style by role and the PMTiles by link,
+  refreshes `file:checksum` after a render, and states the Node 22.5
+  requirement with portable commands (#41, #32).
+- `register-catalog` and `report-catalog-issue` write bodies in Simplified
+  Technical English that pass the org checks. The fork command runs (#47,
+  #48).
+
+### Removed
+
+- `portolan-consume`. Its content lives in `reading-portolan`.
+
 ## 0.2.1 - 2026-08-28
 
 The skills now track Portolan specification v0.2.0 and rashid 0.1.8.

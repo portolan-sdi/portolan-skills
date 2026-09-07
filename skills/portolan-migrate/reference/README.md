@@ -13,10 +13,10 @@ unedited.
 
 | File | What it is for | From | Defect or gap it works around |
 |---|---|---|---|
-| `conformance.md` | Template for `docs/conformance.md`, the record of what the catalog claims and what it does not | both | rashid's data pass skips glob-matched partitions of a partitioned collection with no `data` asset (rashid#130), and stac-validator crashes on every Portolan Collection (portolan-spec#157) |
+| `conformance.md` | Addendum to the template's `docs/conformance.md` for a collection with a remote `partition:glob` | road-detections | rashid expands only a local relative glob, so a remote or absolute glob leaves the partitions unread |
 | `tools/reencode.py` | Rewrite source GeoParquet with conformant row groups, then verify nothing moved | road-detections | Source files hold their whole contents in one row group, over the `PTL-DAT-008` 150,000-row cap |
-| `tools/build_collection.py` | Generate `collection.json` with measured extent, row count, and asset checksums | road-detections | rashid treats a stale `file:checksum` as a conformance failure, so measured fields cannot be typed by hand |
-| `tools/validate_with_data.py` | Run rashid's data pass against staged bytes before publishing | road-detections | Absolute https hrefs do not resolve locally, so `--data-scope local` skips the byte checks silently |
-| `tools/sld_graduated.py` | Convert graduated class-break SLDs into MapLibre `step` expressions | pergamino | The CLI's SLD converter handles categorical rules only and rejects range filters |
+| `tools/build_collection.py` | Generate `collection.json` with measured extent, row count, checksums, and `s3` alternates | road-detections | rashid treats a stale `file:checksum` as a conformance failure, so measured fields cannot be typed by hand |
+| `tools/validate_with_data.py` | Run rashid's data pass against staged bytes before publishing | road-detections | The published `partition:glob` is `s3://`, which rashid cannot list locally, so the partition checks never run |
+| `tools/sld_graduated.py` | Convert graduated class-break SLDs into MapLibre `step` expressions | pergamino | The CLI's SLD converter handles equality filters only and skips range filters. The output needs `fix_styles.py` to get a source URL |
 | `tools/fix_styles.py` | Give every default style a tile source and zoom range, drop duplicate `match` keys | pergamino | Generated styles carry `sources.data` with no URL and no zoom range, so nothing renders |
-| `tools/apply_metadata.py` | Apply per-collection titles, descriptions, providers, and links after every `add` | pergamino | `portolan add` overwrites each collection title with the root title and rewrites `stac_extensions` to the version the CLI ships |
+| `tools/apply_metadata.py` | Apply harvested titles, descriptions, providers, and links after every `add` | pergamino | `portolan add` cannot derive metadata that lives outside the tree, such as upstream abstracts and attribution |

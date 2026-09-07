@@ -1,0 +1,111 @@
+# Local workflow. It is not synced from portolan-ops because it takes
+# repo-specific inputs (the pins). See portolan-ops norms/ci.md.
+#
+# Every skill states facts about portolan-cli, rashid, the spec, and the
+# catalog template. scripts/check_drift.py checks those facts against the
+# versions in pins.toml. On a pull request a stale pin is a warning. On the
+# weekly run it fails the job and keeps one tracking issue open.
+name: Drift
+
+on:
+  pull_request:
+    paths:
+      - "skills/**"
+      - "pins.toml"
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/drift.yml"
+  schedule:
+    - cron: "23 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the pinned upstreams
+        run: |
+          CLI=$(python3 -c 'import tomllib;print(tomllib.load(open("pins.toml","rb"))["portolan-cli"]["version"])')
+          RASHID=$(python3 -c 'import tomllib;print(tomllib.load(open("pins.toml","rb"))["rashid"]["version"])')
+          uv venv .venv
+          uv pip install --python .venv/bin/python \
+            "portolan-cli==$CLI" "rashid==$RASHID" \
+            pytest httpx pyyaml click
+          echo "cli=$CLI rashid=$RASHID"
+
+      - name: Test the checker
+        run: .venv/bin/python -m pytest tests -q
+
+      - name: Check the skills
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MODE: ${{ github.event_name == 'pull_request' && 'pr' || 'cron' }}
+        run: |
+          set +e
+          .venv/bin/python scripts/check_drift.py --mode "$MODE" | tee drift.txt
+          echo "code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the tracking issue
+        if: github.event_name != 'pull_request' && steps.check.outputs.code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'EOF'
+          import pathlib, subprocess, json
+          report = pathlib.Path("drift.txt").read_text()
+          body = "\n".join([
+              "## What happened?",
+              "",
+              "The weekly drift check found a difference between the skills and the pinned upstreams.",
+              "The report is below. Move the pin in `pins.toml`, then edit the skills until the check passes.",
+              "",
+              "## What did you expect?",
+              "",
+              "`uv run scripts/check_drift.py --mode cron` exits 0.",
+              "",
+              "## Minimal reproduction",
+              "",
+              "```",
+              report.rstrip(),
+              "```",
+              "",
+              "## Version",
+              "",
+              "See `pins.toml` on `main`.",
+          ])
+          title = "drift: skills differ from the pinned upstreams"
+          out = subprocess.run(
+              ["gh", "issue", "list", "--state", "open", "--json", "number", "--search", "in:title " + json.dumps(title)],
+              capture_output=True, text=True, check=True).stdout
+          existing = json.loads(out or "[]")
+          if existing:
+              n = str(existing[0]["number"])
+              subprocess.run(["gh", "issue", "edit", n, "--body", body], check=True)
+              print(f"updated #{n}")
+          else:
+              subprocess.run(["gh", "issue", "create", "--title", title, "--label", "bug", "--body", body], check=True)
+              print("created")
+          EOF
+
+      - name: Fail on findings
+        if: steps.check.outputs.code != '0'
+        run: exit 1
