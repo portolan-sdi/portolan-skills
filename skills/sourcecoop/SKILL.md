@@ -173,6 +173,8 @@ portolan metadata init --no-recursive
 - `temporal_extent` — Time range the data covers
 - `providers` — Organizations that created/host the data
 
+Set the `host` provider to the organization that maintains the published copy. You are the host for your Source Cooperative repository. Source Cooperative supplies the storage service, so it is not the host provider. The host provider MUST include a URL or an email address.
+
 ```bash
 # Validate metadata after editing (walks the catalog by default)
 portolan metadata validate
