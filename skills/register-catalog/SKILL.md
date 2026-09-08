@@ -11,25 +11,25 @@ You are helping a user add their Portolan catalog to the [portolan-registry](htt
 
 ## Key fact: submitters provide a URL and an address
 
-A registry entry is a single YAML file with two fields, both required:
+A registry entry is one YAML file with two fields, both required:
 
 ```yaml
 url: https://example.com/stac/catalog.json
 submitter_email: you@example.org
 ```
 
-CI extracts everything else by crawling the catalog: title, description, bbox, license, counts, the schema URI, the `agents` and `describedby` links, the `icon` link, and `providers`. Never add other fields or invent metadata. The [schema](https://github.com/portolan-sdi/portolan-registry/blob/main/schema/entry.schema.json) forbids it with `additionalProperties: false`. An entry that lacks either required field fails the registry check.
+CI extracts everything else by crawling the catalog: title, description, bbox, license, counts, the schema URI, the `agents` and `describedby` links, the `icon` link, and `providers`. Never add other fields or invent metadata. The [schema](https://github.com/portolan-sdi/portolan-registry/blob/main/schema/entry.schema.json) sets `additionalProperties: false`, so CI rejects an extra field. An entry that lacks either required field fails the registry check.
 
 ## Step 1: Validate the catalog
 
-The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Run the validator on the local tree before you register the published copy. `rashid check` takes a directory, not a URL.
+The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Run the validator on the local tree before you register the published copy. `rashid check` takes a directory rather than a URL.
 
 ```bash
 uvx --from 'rashid>=0.1.8,<0.2.0' rashid check ./catalog --summary
 curl -fsSL "$CATALOG_URL" | jq '{type, id, stac_extensions}'
 ```
 
-If the URL does not end in `catalog.json`, is not reachable, or does not return `"type": "Catalog"`, stop and tell the user. If rashid reports errors, show them to the user and let them decide whether to fix the catalog first. The registry mails the submitter when a registered catalog stops validating.
+Stop and tell the user when the URL fails any of these checks. It must end in `catalog.json`. It must be reachable. It must return `"type": "Catalog"`. If rashid reports errors, show them to the user and let them decide whether to fix the catalog first. The registry mails the submitter when a registered catalog stops validating.
 
 ## Step 2: Choose the slug
 

@@ -1,6 +1,6 @@
 ---
 name: portolan-thumbnails
-description: Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style asset server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, gates each image on an automated blank probe plus a visual review, then refreshes file:size and file:checksum with portolan check --fix. Requires Node.js 24.12 or newer.
+description: Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, accepts an image only after an automated blank probe and a visual review, then refreshes file:size and file:checksum with portolan check and its fix flag. Requires Node.js 24.12 or newer.
 ---
 
 <!-- drift: depends-on: portolan-cli, portolan-spec -->
@@ -9,7 +9,8 @@ description: Generate framed, checked thumbnails from Portolan collections using
 
 Render a collection's default style server-side with
 [chiitiler](https://github.com/Kanahiro/chiitiler), frame it to the shape of the
-browser card, and check the result before it ships. The renderer is the easy half.
+browser card, and check the result before you publish it. The renderer is the
+easy half.
 Most bad thumbnails come from the bbox.
 
 Use this for any collection whose thumbnail people will look at. The thumbnails
@@ -35,8 +36,9 @@ chiitiler's `/clip` endpoint takes `bbox`, `size`, `quality`, and a style. The
 aspect ratio and the zoom both fall out of the bbox, so every framing decision is
 a decision about which bbox to send. The raw extent produces tall rectangles in
 wide cards, dense layers rendered so far out that tile thinning shows as holes,
-and a row of cards that all look alike. Rewriting the bbox is reframing, not
-distortion. Nothing gets stretched. `specs/best-practices/conversion-defaults.md`
+and a row of cards that all look alike. Rewriting the bbox reframes the map. It
+keeps the aspect ratio of every feature.
+`specs/best-practices/conversion-defaults.md`
 describes the CLI's own thumbnail as guidance, not conformance.
 
 ## Step 1: Read the collection
@@ -57,9 +59,10 @@ python3 "$SKILL/scripts/read_collection.py" publico_arbolado/
 `bbox` is the starting frame. `thumbnail` and `thumbnail_type` say where to write
 and in which format. `pmtiles_layers` is ground truth for `source-layer`.
 `feature_count` is the strongest strategy signal, and points and lines need more
-zoom than polygons. Those last two come from `geoparquet:*` properties that
-portolan-cli writes. The spec does not define them, nor `pmtiles:max_zoom` and
-`pmtiles:center`. Catalogs from other tools lack them. Read the zoom range and
+zoom than polygons. portolan-cli writes those last two as `geoparquet:*`
+properties. The spec defines none of them, and it defines neither
+`pmtiles:max_zoom` nor `pmtiles:center`. A catalog from another tool lacks them.
+Read the zoom range and
 centre from the PMTiles header instead, which always works.
 
 ```bash
@@ -80,7 +83,7 @@ neighborhoods, watersheds, city limits, and anything with a small feature count.
 **B, zoomed window.** A 3:2 window at a chosen zoom, centred on a dense cluster.
 Right for parcels, buildings, addresses, service requests, permits, and trees.
 
-These are defaults, not rules. Override them when the data says otherwise.
+These are defaults. Override them when the data says otherwise.
 
 | Signal | Default |
 |---|---|
@@ -119,7 +122,7 @@ python3 "$SKILL/scripts/frame.py" --bbox "$BBOX" --size 1024
 
 Read `fill` and `aspect` before you render. A `fill` near 1 means the data nearly
 fills the frame. A `fill` of exactly 0.4 means `MAX_CONTEXT` capped the growth and
-the frame never reached 3:2. When the aspect warning fires you have two moves.
+the frame never reached 3:2. When the aspect warning appears you have two moves.
 Force the target with `--max-context 99` and accept the extra context, or switch
 to Strategy B. Record which you chose.
 
@@ -136,7 +139,7 @@ Zoom governs how much ground the window covers. At `--size 1024` the longest
 framed edge runs 78.3 km at zoom 11, 39.1 at 12, 19.6 at 13, 9.8 at 14, 4.9 at 15,
 2.4 at 16, and 1.2 at 17.
 
-A useful window sits at or above the archive's `max_zoom`, where tile thinning
+A useful window is at or above the archive's `max_zoom`, where tile thinning
 stops, and at least two levels below the full-extent zoom Strategy A reported,
 where it stops looking like an overview. Doubling `--size` to 2048 buys one more
 level of detail at the same extent. Downscale afterwards. For a dense point layer
@@ -199,11 +202,12 @@ Pass a format, size, and quality as the third to fifth arguments. `USE_BASEMAP`,
 `BASEMAP_URL`, and `BASEMAP_OPACITY` are environment variables.
 
 `buildstyle.py` rewrites the style in memory and never modifies the published
-file. It repoints every source at the local archive through `pmtiles://`, drops
-`symbol` layers, and puts a white background under an optional basemap. It also
+file. It repoints every source at the local archive through `pmtiles://`. Then
+it drops `symbol` layers and puts a white background under an optional basemap.
+It also
 declares the archive's zoom range on the source, which is the most important
-line. Without it MapLibre assumes the source goes to zoom 22, asks for a tile the
-archive does not contain, and draws nothing. That produces an all-basemap
+line. Without it MapLibre assumes the source goes to zoom 22. It then asks for a
+tile the archive does not contain and draws nothing. That produces an all-basemap
 thumbnail.
 
 ## Step 5: Check the result
@@ -214,7 +218,8 @@ Two gates. Both run before anything is pushed.
 
 `render_one.sh` renders a 256-pixel probe over the same bbox with the collection's
 layers on a white background and no basemap, plus a blank reference that is the
-white background alone. Identical hashes mean no data landed in the frame. A probe
+white background alone. Identical hashes mean the frame received no data. A
+probe
 within 15% of the blank's file size means almost none did. A render error
 returns 500 with a short text body, and `curl -o` writes that text into your
 image file. The script deletes the file and prints the body when that happens.
@@ -229,7 +234,7 @@ View every image. Six questions. Any "no" is a failure.
 3. **Shape.** Is it landscape and close to 3:2? A portrait image fails unless you
    chose full-extent framing for a boundary layer and said so.
 4. **Completeness.** Do continuous fabrics such as parcels run edge to edge
-   without holes? Holes mean the render sits below the archive's maximum zoom.
+   without holes? Holes mean the render is below the archive's maximum zoom.
 5. **Legibility at card size.** Imagine it at 350x230. Pale fills over a light
    basemap read as flat grey.
 6. **Distinctness.** Set beside its siblings, is it recognisable?
@@ -238,12 +243,12 @@ View every image. Six questions. Any "no" is a failure.
 
 | Symptom | Fix |
 |---|---|
-| All basemap, probe empty | Confirm `source-layer` matches `pmtiles_layers`, the source key survived the rewrite, and the bbox intersects the data |
+| All basemap, probe empty | Confirm `source-layer` matches `pmtiles_layers`, the rewrite kept the source key, and the bbox intersects the data |
 | All basemap, probe has data | The data is under the basemap or fully transparent. Check layer order and paint opacity |
-| Black background | The basemap failed to fetch and transparency became black. Check the `{z}/{x}/{y}` template survived the shell |
+| Black background | The basemap failed to fetch and transparency became black. Check that the shell did not expand the `{z}/{x}/{y}` template |
 | Thin or portrait image | Framing was skipped, or `MAX_CONTEXT` capped it. Re-run `frame.py`, then either `--max-context 99` or Strategy B |
 | Sliver of data in a big frame | `fill` is too low. Switch to Strategy B, or crop with a quantile trim |
-| Scattered holes in a continuous fabric | Shrink the window until the render sits at or above `max_zoom`. If it already does, the archive needs retiling |
+| Scattered holes in a continuous fabric | Shrink the window until the render is at or above `max_zoom`. If it already does, the archive needs retiling |
 | Washed out, flat grey | Lower `BASEMAP_OPACITY`, use a no-labels basemap, or raise the fill opacity in the style |
 | Identical to a sibling | Change strategy, raise the `OFFSET` rank, or change the palette |
 
@@ -257,11 +262,11 @@ catalog.
 
 ## Style defects the validator misses
 
-Each of these reaches this skill as a failed request or a blank image, never as a
-validator finding.
+This skill sees each of these as a failed request or a blank image. The
+validator reports none of them.
 
 **A `symbol` layer with no `glyphs` endpoint kills the renderer.** MapLibre GL
-Native crashes when a layer needs a font it cannot fetch. The worker dies and curl
+Native crashes when a layer needs a font it cannot fetch. The worker exits and curl
 reports an empty reply rather than a status code. `buildstyle.py` strips `symbol`
 layers for this reason. To keep labels in the image, add a `glyphs` entry to the
 style and remove that filter.
@@ -271,7 +276,7 @@ the style with HTTP 400 when the labels are floats, or when integers sit beside 
 string. Wrap the getter as `["to-string", ["get", "col"]]`, write each integral
 float as an integer so `1.0` becomes `"1"`, and drop the duplicate labels.
 
-**Three paint patterns render blank, and no renderer is at fault.**
+**These paint patterns render blank, and no renderer is at fault.**
 `fill-opacity` of `0.0`, a white `circle-color` on the white background, and a
 white fill at partial opacity each render nothing. Raise the opacity. Give a white
 circle a stroke, and a white fill an outline.
@@ -300,7 +305,7 @@ publico_barrios	A	-60.651220,-33.935211,-60.495382,-33.848971	13.17	-	pass
 
 ## Step 7: Refresh checksums and push
 
-The thumbnail asset carries `file:size` and `file:checksum`. They MUST match the
+The thumbnail asset has `file:size` and `file:checksum`. They MUST match the
 bytes the `href` resolves to (PORTO-CORE-030). A re-render changes the bytes, so a
 collection you pushed without this step fails the checksum check. Run the fix
 from the catalog root, confirm the check is clean, then push.
@@ -341,7 +346,7 @@ the environment failures.
 |-------|----------|
 | `ERR_UNKNOWN_BUILTIN_MODULE: node:sqlite` | Node is too old. Install 24.12 or newer |
 | Server will not start | Read `/tmp/chiitiler.log`. When another session holds 13579, export a free `PORT` before both scripts |
-| `curl` reports an empty reply | The worker died. A `symbol` layer with no `glyphs` endpoint is the usual cause |
+| `curl` reports an empty reply | The worker exited. A `symbol` layer with no `glyphs` endpoint is the usual cause |
 | Basemap not loading | Check network access, and check the log for a truncated `{z` in the requested URL |
 | Render returns 500 | The style is invalid, or a source is unreachable. `/tmp/chiitiler.log` names the cause |
 | New thumbnail not showing in the browser | The asset `href` still points at the old file. See Step 7 |

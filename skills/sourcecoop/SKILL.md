@@ -85,11 +85,11 @@ mv *.parquet buildings/
 portolan add .
 ```
 
-Add `--pmtiles` for vector collections so the catalog ships a render path (PORTO-CORE-065). The CLI writes the PMTiles as a `rel: pmtiles` link with a `pmtiles:layers` array (PORTO-FMT-011) and a default style asset under `styles/`.
+Add `--pmtiles` for vector collections so the catalog provides a render path (PORTO-CORE-065). The CLI writes the PMTiles as a `rel: pmtiles` link with a `pmtiles:layers` array (PORTO-FMT-011) and a default style asset under `styles/`.
 
 ## Step 5: write metadata
 
-`portolan metadata init` writes a `.portolan/metadata.yaml` template at every STAC level. `portolan metadata validate` requires `contact.name`, `contact.email`, and `license`. Nothing else is required by the CLI. The spec requires more.
+`portolan metadata init` writes a `.portolan/metadata.yaml` template at every STAC level. `portolan metadata validate` requires `contact.name`, `contact.email`, and `license`. The CLI requires no other field. The spec requires more.
 
 Fill these fields at every level:
 
@@ -115,15 +115,20 @@ portolan metadata validate
 portolan readme
 ```
 
-Never hand-edit a generated README. Edit `.portolan/metadata.yaml` and regenerate. The README must carry a title, a description, the license, and the data provenance (PORTO-CORE-063).
+Never hand-edit a generated README. Edit `.portolan/metadata.yaml` and regenerate. PORTO-CORE-063 requires four things in the README:
 
-`AGENTS.md` is not generated from metadata. The CLI scaffolds a stub. Replace the stub at the catalog and at every collection with real content: what the data is, how the files connect, and queries you ran against the data. Follow the `portolan-bootstrap` skill and `specs/best-practices/documentation.md` for what belongs there.
+- the title
+- the description
+- the license
+- the data provenance
+
+`AGENTS.md` is not generated from metadata. The CLI scaffolds a stub. Replace the stub at the catalog and at every collection with real content. Describe the data, explain how the files connect, and show queries you ran against the data. Follow the `portolan-bootstrap` skill and `specs/best-practices/documentation.md` for what belongs there.
 
 ## Linking to Source Cooperative
 
 Source Cooperative serves the same objects under two hostnames. `source.coop` renders a page a person can read. `data.source.coop` returns raw bytes.
 
-- `source.coop`: links in `metadata.yaml`, STAC `description` fields, generated READMEs, issue and pull request bodies.
+- `source.coop`: the human-facing host. Use it in `metadata.yaml` links, STAC `description` fields, generated READMEs, and issue and pull request bodies.
 - `data.source.coop`: STAC asset `href` values, `curl`, DuckDB `read_parquet()`, anything a client resolves programmatically.
 
 ```
