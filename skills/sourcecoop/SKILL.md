@@ -3,7 +3,7 @@ name: sourcecoop
 description: Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI.
 ---
 
-<!-- drift: depends-on: portolan-cli, rashid, portolan-spec -->
+<!-- drift: depends-on: portolan-cli, rashid, portolan-spec, source-coop-cli -->
 
 # Source Cooperative Upload Skill
 
@@ -13,20 +13,24 @@ The [Portolan spec](https://github.com/portolan-sdi/portolan-spec) is ground tru
 
 ## Prerequisites
 
-Source Cooperative requires automated access for programmatic uploads. Check for it before anything else:
+Source Cooperative serves its object storage through a data proxy at `data.source.coop`. The [`source-coop` CLI](https://github.com/source-cooperative/source-coop-cli) authenticates you against the proxy and issues temporary S3 credentials. Check for it first:
 
 ```bash
-grep -l "source" ~/.aws/credentials 2>/dev/null \
-  || echo "No source profile found"
-portolan config list
+source-coop --version
 ```
 
-If no credentials exist, the user with automated access sets them up in Step 2. The user without access requests it at hello@source.coop.
+Install it with Homebrew, or with the installer script the CLI README documents:
+
+```bash
+brew install source-cooperative/tap/source-coop
+```
+
+You also need a Source Cooperative account with write access to the repository. The user without access requests it at hello@source.coop.
 
 ## Workflow Overview
 
 1. Gather the organization and product names.
-2. Set credentials in `.env`.
+2. Log in with `source-coop` and set the remote in `.env`.
 3. Initialize the catalog with a license.
 4. Add files.
 5. Write metadata: contact, license, providers, `source_url`.
@@ -41,28 +45,66 @@ Ask the user for:
 1. The Source Cooperative organization slug (required). Examples: `nlebovits`, `radiant-mlhub`, `vida`.
 2. The product name (optional). Defaults to the current directory name.
 
-Build the remote URL:
+The proxy addresses the account as the bucket and the repository as the key prefix. Build the remote URL from them:
 
 ```
-s3://us-west-2.opendata.source.coop/{org}/{product}/
+s3://{org}/{product}/
 ```
 
-## Step 2: Credential Setup
+## Step 2: Log in and set the remote
 
-The CLI refuses to store `remote`, `profile`, and `region` in `.portolan/config.yaml`. That file is pushed with the catalog. Put them in `.env` at the catalog root or in `PORTOLAN_REMOTE` and `PORTOLAN_PROFILE` environment variables.
+`source-coop login` opens a browser for the OAuth2 authorization code flow. It caches the temporary credentials in the OS keyring:
 
 ```bash
-# ~/.aws/credentials needs a profile named "source-coop"
-# with the key pair from the Source Cooperative dashboard.
+source-coop login
+```
+
+### The remote
+
+The remote is the destination that `portolan push` writes to. The proxy addresses the account as the bucket and the repository as the key prefix. `portolan push` reads the destination from `PORTOLAN_REMOTE` when you give it no argument.
+
+The CLI refuses to store `remote`, `profile`, `region`, and `s3_endpoint` in `.portolan/config.yaml`. That file is pushed with the catalog. Put the remote and the endpoint in `.env` at the catalog root:
+
+```bash
 cat > .env << 'EOF'
-PORTOLAN_REMOTE=s3://us-west-2.opendata.source.coop/{org}/{product}/
-PORTOLAN_PROFILE=source-coop
+PORTOLAN_REMOTE=s3://{org}/{product}/
+PORTOLAN_S3_ENDPOINT=data.source.coop
 EOF
 
 portolan config list
 ```
 
-Source Cooperative issues temporary credentials. When an upload fails with an auth error, refresh the key pair from the dashboard.
+`PORTOLAN_S3_ENDPOINT` sends every request to the proxy with path-style addressing. Without it, the CLI resolves the bucket against AWS.
+
+### Credentials for portolan push
+
+`source-coop creds --format env` prints the `export` lines that `portolan push` reads:
+
+```bash
+eval $(source-coop creds --format env)
+```
+
+The command sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` in the current shell. Run `portolan push` in that same shell. The credentials expire. When an upload fails with `AccessDenied`, run `source-coop login` and the `eval` line again.
+
+### The AWS profile for every other tool
+
+The aws CLI, boto3, rclone, and DuckDB read `~/.aws/config`. Add this profile once to point them at the proxy:
+
+```ini
+[profile source]
+credential_process = source-coop creds
+endpoint_url = https://data.source.coop
+```
+
+```bash
+aws s3 ls s3://{org}/{product}/ --profile source
+```
+
+botocore runs `source-coop creds` on each call, so this profile refreshes itself. Use it to list the prefix and to confirm what the push wrote.
+
+`portolan push` reads the profile name, but it looks only in `~/.aws/credentials` for a key pair. It does not run `credential_process`, and it does not read `endpoint_url`. From `~/.aws/config` it reads only `region`. Do not set `PORTOLAN_PROFILE=source`. A profile name other than `default` also discards the environment credentials that the `eval` line set. The push then finds no key pair and falls back to the instance metadata service at `169.254.169.254`.
+
+portolan-sdi/portolan-cli#872 tracks `credential_process` support in the CLI. Use the `eval` line above until a release includes it.
 
 ## Step 3: Initialize Catalog
 
@@ -174,23 +216,23 @@ Style files upload with `portolan push` like any other asset. For how many style
 
 ### Access denied or 403 Forbidden
 
-The credentials are invalid, expired, or scoped to another prefix.
+The credentials expired, or they do not cover the prefix.
 
-1. Check `~/.aws/credentials` under `[source-coop]`.
-2. Check that `PORTOLAN_REMOTE` matches the assigned prefix exactly.
-3. Refresh the credentials from the Source Cooperative dashboard.
-4. Contact hello@source.coop for access to a different prefix.
+1. Run `source-coop login`, then `eval $(source-coop creds --format env)` in the shell you push from.
+2. Check that `AWS_SESSION_TOKEN` is set in that shell.
+3. Check that `PORTOLAN_REMOTE` names the organization and the repository you have write access to.
+4. Contact hello@source.coop for access to a different repository.
 
-### No such bucket
+### Bucket not found
 
-The bucket is always `us-west-2.opendata.source.coop`. Check `PORTOLAN_REMOTE` in `.env`.
+The proxy returns `NoSuchBucket: bucket not found: {org}` when the first path segment is not an account. Check the organization slug in `PORTOLAN_REMOTE`. The remote takes the form `s3://{org}/{product}/`, not the name of an S3 bucket.
 
 ### Push conflict
 
 Someone else pushed since your last pull. `portolan pull` requires the remote URL as an argument:
 
 ```bash
-portolan pull s3://us-west-2.opendata.source.coop/{org}/{product}/
+portolan pull s3://{org}/{product}/
 portolan push
 ```
 
@@ -212,9 +254,11 @@ A CORS or range finding from `rashid check --live` names a host you do not contr
 cd ~/data/phl-aerial-imagery
 portolan init --title "Philadelphia Aerial Imagery" --auto --license CC-BY-4.0
 cat > .env << 'EOF'
-PORTOLAN_REMOTE=s3://us-west-2.opendata.source.coop/nlebovits/phl-aerial-imagery/
-PORTOLAN_PROFILE=source-coop
+PORTOLAN_REMOTE=s3://nlebovits/phl-aerial-imagery/
+PORTOLAN_S3_ENDPOINT=data.source.coop
 EOF
+source-coop login
+eval $(source-coop creds --format env)
 portolan add . --pmtiles
 portolan metadata init
 # Edit .portolan/metadata.yaml: contact, license, providers, source_url
