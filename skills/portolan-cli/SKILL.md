@@ -3,296 +3,112 @@ name: portolan-cli
 description: Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
 ---
 
+<!-- drift: depends-on: portolan-cli, portolan-spec, rashid -->
+
 # Portolan CLI
 
-Publish and manage cloud-native geospatial data catalogs.
+Portolan is a specification for cloud-native geospatial data catalogs, built on STAC. `portolan-cli` implements it. The [portolan-spec](https://github.com/portolan-sdi/portolan-spec) repository is ground truth. Read `specs/portolan/core.md` and `specs/portolan/formats.md` there when a requirement is in doubt. The CLI converts data to GeoParquet, COG, and PMTiles. It then writes the STAC tree and validates it. `portolan push` syncs the result to object storage. There is no server. A catalog is static files.
 
-Portolan is a CLI for publishing and managing **cloud-native geospatial data catalogs**. It orchestrates format conversion (GeoParquet, COG), versioning, and sync to object storage (S3, GCS, Azure) — no running servers, just static files.
-
-**Specification:** The [Portolan Spec](https://github.com/portolan-sdi/portolan-spec) defines catalog structure, format requirements, and versioning rules. When in doubt about requirements, read the spec files directly (`core.md`, `structure.md`, `versions.md`, `formats/vector.md`, `formats/raster.md`, `formats/pointcloud.md`, `best-practices.md`) for the most up-to-date information.
-
-**Key concepts:**
-- **STAC** (SpatioTemporal Asset Catalog) — The catalog metadata spec. Portolan is a STAC profile, not a competing spec.
-- **GeoParquet** — Cloud-optimized vector data (columnar, spatial indexing)
-- **COG** (Cloud-Optimized GeoTIFF) — Cloud-optimized raster data (HTTP range requests)
-- **COPC** (Cloud-Optimized Point Cloud) — Cloud-optimized point cloud data
-- **PMTiles** — Cloud-optimized vector/raster tiles for web map rendering
-- **versions.json** — Single source of truth for version history, sync state, and checksums
+This skill tracks the PyPI release named in `pins.toml`. Run `portolan <command> --help` for the options of any command. The help text is the reference. This skill only says which command to reach for and in what order.
 
 ## Installation
 
 ```bash
-pipx install portolan-cli    # Isolated (recommended)
-pip install portolan-cli     # Or with pip
-uv pip install portolan-cli  # Or with uv
+uv tool install portolan-cli
+portolan --version
 ```
 
-If portolan is not installed, guide the user through installation before proceeding.
+## Files the CLI writes
 
-## Catalog Structure
+`portolan init` writes a root `catalog.json`, `AGENTS.md`, `README.md`, `versions.json`, and `.portolan/config.yaml` plus `.portolan/metadata.yaml`. The root declares the v0.2.0 schema URI in `stac_extensions`. That URI is the only signal of the spec version (PORTO-CORE-006). Its links are `root`, `agents`, and `describedby`. It writes no `self` link. Add an absolute `self` link at publish time (PORTO-CORE-081).
 
-Portolan catalogs use a flat hierarchy with STAC metadata:
+`portolan add <dir>` turns a directory into a collection. For one GeoParquet file, with `--pmtiles`, it writes:
 
 ```
-project/
-├── .portolan/
-│   ├── config.yaml              # Internal config (sentinel file)
-│   └── state.json               # Local sync state
-├── catalog.json                 # STAC Catalog (root metadata)
-├── versions.json                # Catalog-level version tracking
-└── {collection_id}/
-    ├── collection.json          # STAC Collection metadata
-    ├── versions.json            # Collection-level versioning
-    ├── {data}.parquet           # Single-file collection asset
-    ├── {data}.pmtiles           # Visualization derivative
-    └── thumbnail.png            # Preview image
+demo/
+├── collection.json
+├── AGENTS.md
+├── README.md
+├── versions.json
+├── data.parquet          asset role: data
+├── data.pmtiles          asset role: visual, plus a rel: pmtiles link
+├── data.thumb.jpg        asset role: thumbnail
+└── styles/default.json   asset roles: style, default
 ```
 
-**Single-file collections** (one GeoParquet/COG) use collection-level assets directly — no item directory needed.
+Without `--pmtiles` there is no PMTiles file and no `styles/` directory, so a vector collection has no render path (PORTO-CORE-065). Pass `--pmtiles` for vector data.
 
-**Partitioned collections** (>2GB) use item subdirectories per partition.
+`AGENTS.md` and `README.md` beside every `catalog.json` and `collection.json` are spec requirements (PORTO-CORE-005). `versions.json` is a CLI artifact that tracks sync state and checksums. It is not part of the spec. Dataset versioning uses the STAC version extension (PORTO-CORE-008).
 
-All STAC links use relative paths (`SELF_CONTAINED`) — catalogs are portable across hosting locations.
+One file is a collection-level asset with no item (PORTO-CORE-017). A partitioned collection uses the partition extension and its `partition:glob` (PORTO-FMT-017). Items for opaque partition schemes are not created (PORTO-FMT-022). Many raster scenes in one collection get one item each (PORTO-CORE-071), and `portolan stac-geoparquet` writes the `items.parquet` mirror for it.
 
-## CLI Commands
+Structural links stay relative, so the catalog is portable.
 
-### `portolan init`
-Initialize a new Portolan catalog.
+## Which command
+
+| Task | Command |
+|---|---|
+| Start a catalog | `portolan init --license <SPDX>` |
+| See what a directory contains before you add it | `portolan scan <dir>` |
+| Add or update a collection | `portolan add <dir>` |
+| Register remote data without copying it | `portolan add-external` |
+| Validate against the spec | `portolan check` |
+| Convert non-cloud-native files in place | `portolan check --fix` |
+| Probe the published host for range requests and CORS | `portolan check --live --url <public base>` |
+| Split a large GeoParquet file | `portolan partition` |
+| Upload | `portolan push <remote>` |
+| Download a remote catalog | `portolan pull <remote>` or `portolan clone <remote>` |
+| Pull, check, and push one collection | `portolan sync <remote> -c <collection>` |
+| Edit the metadata behind the READMEs | `portolan metadata init`, `portolan metadata validate` |
+| Regenerate READMEs | `portolan readme` |
+| Publish a logo | `portolan logo <file>` |
+| Manage collection versions | `portolan version` |
+| Read a skill from this repository | `portolan skills list`, `portolan skills show` |
+
+Facts that trip agents:
+
+- `init` needs `--license` whenever `--auto` or `--json` is passed. Without them it prompts.
+- `sync` requires `-c`. It runs on one collection, never catalog-wide.
+- `check` reads remote assets over range requests in its data pass. Pass `--data-scope local` to read only assets inside the tree, or `--no-data` to skip the pass.
+- `check --fix` removes `portolan:datetime_provisional` from items. The item then has no provisional marker.
+- `add` takes `--pmtiles`, `--force-pmtiles`, `--thumbnails`, `--force-thumbnails`, `--stac-geoparquet`, `--item-id`, `--datetime`, `--reconvert`, and `--force`. `--force-pmtiles` implies `--pmtiles`.
+- `push --workers` is the parallelism across collections. `--concurrency` is the upload parallelism within one, default 8. Neither has a cap.
+- The root group takes `--format json`. Most subcommands take `--json`. `partition` accepts no JSON flag.
+- `check` calls the pinned `rashid`. Where the two disagree, the spec decides, and the disagreement is a bug to report.
+
+## Workflows
+
+Publish a new catalog:
 
 ```bash
-portolan init                       # Initialize in current directory
-portolan init --auto                # Skip prompts, use defaults
-portolan init --title "My Catalog"  # Set title
-portolan init /path/to/data --auto  # Initialize in specific directory
-```
-
-### `portolan scan`
-Scan a directory for geospatial files and potential issues.
-
-```bash
-portolan scan                         # Scan current directory
-portolan scan --json                  # JSON output
+portolan init --auto --license CC-BY-4.0 --title "My Geospatial Data"
 portolan scan /data/geospatial
-portolan scan /large/tree --max-depth=2
+portolan add demographics/ --pmtiles
+portolan check
+portolan push s3://mybucket/my-catalog -c demographics
 ```
 
-### `portolan check`
-Validate a Portolan catalog or check files for cloud-native status.
+Update one collection end to end:
 
 ```bash
-portolan check                        # Validate all (metadata + geo-assets)
-portolan check --metadata             # Validate metadata only
-portolan check --geo-assets           # Check geo-assets only
-portolan check --fix                  # Fix both metadata and geo-assets
-```
-
-### `portolan add`
-Track files in the catalog.
-
-```bash
-portolan add demographics/census.parquet
-portolan add file1.geojson file2.geojson   # Add multiple files
-portolan add imagery/                      # Add all files in directory
-portolan add .                             # Add all files in catalog
-```
-
-### `portolan push`
-Push local catalog changes to cloud object storage.
-
-```bash
-portolan push s3://mybucket/catalog --collection demographics
-portolan push gs://mybucket/catalog -c imagery --dry-run
-portolan push s3://mybucket/catalog
-portolan push --dry-run  # Uses configured remote
-```
-
-### `portolan pull`
-Pull updates from a remote catalog.
-
-```bash
-portolan pull s3://mybucket/my-catalog --collection demographics
-portolan pull s3://mybucket/catalog -c imagery --dry-run
-portolan pull s3://mybucket/catalog
-portolan pull s3://mybucket/catalog --workers 4
-```
-
-### `portolan sync`
-Sync local catalog with remote storage (pull + push).
-
-```bash
-portolan sync s3://mybucket/catalog --collection demographics
-portolan sync s3://mybucket/catalog -c imagery --dry-run
-portolan sync s3://mybucket/catalog -c data --fix --force
-```
-
-### `portolan clone`
-Clone a remote catalog to a local directory.
-
-```bash
-portolan clone s3://mybucket/my-catalog
-portolan clone s3://mybucket/my-catalog .
-portolan clone s3://mybucket/catalog -c demographics
-```
-
-### `portolan status`
-Show local vs remote version state for collections.
-
-```bash
-portolan status                    # Status for all collections
-portolan status -c demographics    # Status for one collection
-portolan status --offline          # Skip remote check
-portolan status --json             # JSON output for agents
-```
-
-### `portolan list`
-List all files in the catalog with tracking status.
-
-```bash
-portolan list                           # List all files with status
-portolan list --collection demographics # Filter by collection
-portolan list --tracked-only            # Show only tracked files
-```
-
-### `portolan info`
-Show information about a file, collection, or catalog.
-
-```bash
-portolan info demographics/census.parquet  # File info
-portolan info demographics/                # Collection info
-portolan info                              # Catalog info
-portolan info demographics/census.parquet --json
-```
-
-### `portolan rm`
-Remove files from tracking.
-
-```bash
-portolan rm --keep imagery/old_data.tif     # Safe: untrack only
-portolan rm --dry-run vectors/              # Preview
-portolan rm -f demographics/census.parquet  # Force delete and untrack
-```
-
-### `portolan partition`
-Partition a large GeoParquet file for better query performance.
-
-```bash
-portolan partition buildings.parquet --preview
-portolan partition buildings.parquet output/
-portolan partition buildings.parquet output/ --target-rows 50000
-```
-
-### `portolan extract`
-Extract data from external sources into Portolan catalogs.
-
-```bash
-portolan extract arcgis https://services.arcgis.com/.../FeatureServer ./output
-portolan extract arcgis URL --layers "Census*" --dry-run
-portolan extract arcgis URL --filter "sdn_*" --resume
-```
-
-### `portolan metadata`
-Manage catalog metadata for README generation.
-
-```bash
-portolan metadata init                # Create template at catalog root
-portolan metadata init demographics   # Create template for collection
-portolan metadata validate            # Validate metadata.yaml
-```
-
-### `portolan readme`
-Generate README.md from STAC metadata and metadata.yaml.
-
-```bash
-portolan readme                    # Generate at catalog root
-portolan readme demographics       # Generate for collection
-portolan readme --stdout           # Print without writing
-portolan readme --check            # CI mode: exit 1 if stale
-```
-
-### `portolan stac-geoparquet`
-Generate items.parquet for efficient STAC queries.
-
-```bash
-portolan stac-geoparquet                       # Generate for ALL collections
-portolan stac-geoparquet -c landsat            # Generate for one collection
-portolan stac-geoparquet -c imagery --dry-run  # Preview
-```
-
-### `portolan config`
-Manage catalog configuration.
-
-```bash
-portolan config set backend iceberg
-portolan config get remote
-portolan config list
-```
-
-### `portolan clean`
-Remove all Portolan metadata while preserving data files.
-
-```bash
-portolan clean           # Remove all metadata
-portolan clean --dry-run # Preview what would be removed
-```
-
-## Common Workflows
-
-### Publishing a New Catalog
-
-```bash
-portolan init --title "My Geospatial Data"
-portolan scan /data/geospatial
-portolan check --geo-assets --fix    # Convert to cloud-native formats
-portolan add demographics/
-portolan push s3://mybucket/my-catalog --collection demographics
-```
-
-### Full Sync (Recommended)
-
-Single command: pull -> init -> scan -> check -> push:
-
-```bash
-portolan sync s3://mybucket/my-catalog --collection demographics
 portolan sync s3://mybucket/my-catalog -c demographics --fix
 ```
 
-## Versioning
-
-Versions follow Semantic Versioning per collection:
-- **Major**: Breaking changes (schema changes, column removals, CRS changes)
-- **Minor**: New features (new columns, new items)
-- **Patch**: Data updates (same schema, new data)
-
-Each collection's `versions.json` tracks version history with SHA-256 checksums per asset.
-
-## JSON Output
-
-All commands support `--json` or `--format json`:
+Read the JSON envelope when a script runs the CLI:
 
 ```bash
+portolan --format json check
 portolan scan . --json
-portolan check --format json
-portolan --format json init --auto
 ```
 
-Consistent envelope: `{"success": true, "command": "...", "data": {...}, "errors": []}`.
-
-## Python API
-
-```python
-from portolan_cli import Catalog, FormatType, detect_format
-
-catalog = Catalog("/path/to/data")
-format_type = detect_format("data.parquet")  # Returns FormatType.GEOPARQUET
-```
+The envelope is `{"success": true, "command": "...", "data": {...}, "errors": []}`.
 
 ## Troubleshooting
 
 | Error | Solution |
 |-------|----------|
-| "Not inside a Portolan catalog" | Run `portolan init` or navigate into existing catalog |
-| "Catalog already exists" | Remove `catalog.json` and `.portolan/` to reinitialize |
-| "Push conflict: remote has newer version" | Run `portolan pull` first, or `--force` to overwrite |
-| "Pull blocked by uncommitted changes" | Push local changes first, or `--force` to discard |
-| Shapefile missing components | Ensure .shp, .shx, .dbf files are all present |
-| Non-cloud-native files | Use `portolan check --fix` to convert (vectors -> GeoParquet, rasters -> COG) |
+| "Not inside a Portolan catalog" | Run `portolan init` or move into the catalog. |
+| `PRTLN-VAL004` | `init` or `add-external` ran with `--auto` and no `--license`. |
+| "Push conflict: remote has newer version" | Run `portolan pull` first, or pass `--force` to overwrite. |
+| Shapefile missing components | Provide `.shp`, `.shx`, and `.dbf` together. |
+| Non-cloud-native files | Run `portolan check --fix` to convert vectors to GeoParquet and rasters to COG. |

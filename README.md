@@ -4,32 +4,42 @@ AI agent skills for working with [Portolan](https://github.com/portolan-sdi/port
 
 Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
 
+The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
+
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
+### `git-backed-catalog`
+
+Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
+
 ### `portolan-bootstrap`
 
-End-to-end catalog creation from a data source - extract, enrich metadata, generate assets, push to remote
+Build a complete, well-documented Portolan catalog from a data source. Research the data and its publisher, convert to cloud-native formats, write the documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
 
 ### `portolan-cli`
 
 Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
 
-### `portolan-consume`
+### `portolan-migrate`
 
-Guide users through querying and exploring Portolan/STAC catalogs with optimized GeoParquet and COGs
+Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and does not meet the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
 
 ### `portolan-thumbnails`
 
-Generate high-quality thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's actual styles/default.json server-side with optional basemap. Requires Node.js 18+.
+Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, accepts an image only after an automated blank probe and a visual review, then refreshes file:size and file:checksum with portolan check and its fix flag. Requires Node.js 24.12 or newer.
 
 ### `reading-portolan`
 
-Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers navigating STAC metadata, querying GeoParquet with DuckDB, cross-dataset joins, geospatial analysis, and creating interactive maps with PMTiles/MapLibre/deck.gl/Potree.
+Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers AGENTS.md and STAC metadata, assets by role, DuckDB queries over GeoParquet and Parquet, COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
 
 ### `register-catalog`
 
 Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
+
+### `report-catalog-issue`
+
+Report a problem with a catalog registered in the Portolan registry by opening a catalog feedback issue against it.
 
 ### `sourcecoop`
 
@@ -46,7 +56,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, `portolan:sourcecoop`, and `portolan:register-catalog`.
+Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
 ### Claude.ai (Web / Cowork / Desktop)
 
@@ -67,17 +77,23 @@ Gemini CLI natively supports the same `SKILL.md` format:
 ```bash
 # Install skills at user scope
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-cli --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/reading-portolan --consent
+  --path skills/git-backed-catalog --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/portolan-bootstrap --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-consume --consent
+  --path skills/portolan-cli --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/sourcecoop --consent
+  --path skills/portolan-migrate --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-thumbnails --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/reading-portolan --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/register-catalog --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/report-catalog-issue --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/sourcecoop --consent
 
 # Or at workspace scope (shared via version control)
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
