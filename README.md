@@ -58,17 +58,17 @@ claude plugin install portolan
 
 Skills become available under the `portolan:` prefix: `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
-### Claude.ai (Web / Cowork / Desktop)
+### Claude.ai (web and desktop apps)
 
-Claude.ai now supports plugin marketplaces directly:
+Claude.ai supports plugin marketplaces directly, including in Cowork:
 
 1. Open **Settings → Customize** (or the **Customize** panel in Cowork)
 2. Go to the **Plugins** tab
-3. Click **Add → Add marketplace  → Add from a repository**
+3. Select **Add → Add marketplace → Add from a repository**
 4. Enter `portolan-sdi/portolan-skills`
 5. Install the **Portolan** plugin from the marketplace
 
-The skills will then be available in your Claude sessions, including Cowork.
+The skills then become available in your Claude sessions, including Cowork.
 
 ### Gemini CLI
 
