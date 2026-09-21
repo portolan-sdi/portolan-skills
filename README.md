@@ -48,9 +48,17 @@ claude plugin install portolan
 
 Skills become available as `portolan:portolan-cli`, `portolan:reading-portolan`, `portolan:portolan-bootstrap`, `portolan:portolan-consume`, `portolan:sourcecoop`, and `portolan:register-catalog`.
 
-### Claude Code (Web / Cowork)
+### Claude.ai (Web / Cowork / Desktop)
 
-The web app at [claude.ai/code](https://claude.ai/code) does not currently support plugin installation. To use these skills in Cowork, paste the content of a SKILL.md file into your project's `CLAUDE.md` or provide it as context.
+Claude.ai now supports plugin marketplaces directly:
+
+1. Open **Settings → Customize** (or the **Customize** panel in Cowork)
+2. Go to the **Plugins** tab
+3. Click **Add → Add marketplace**
+4. Enter `portolan-sdi/portolan-skills`
+5. Install the **Portolan** plugin from the marketplace
+
+The skills will then be available in your Claude sessions, including Cowork.
 
 ### Gemini CLI
 
