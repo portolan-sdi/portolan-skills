@@ -54,7 +54,7 @@ Claude.ai now supports plugin marketplaces directly:
 
 1. Open **Settings → Customize** (or the **Customize** panel in Cowork)
 2. Go to the **Plugins** tab
-3. Click **Add → Add marketplace**
+3. Click **Add → Add marketplace  → Add from a repository**
 4. Enter `portolan-sdi/portolan-skills`
 5. Install the **Portolan** plugin from the marketplace
 
