@@ -16,3 +16,6 @@ sha = "ed23c3b"
 
 [portolan-registry]
 sha = "9bcfcb2"
+
+[portolan-browser]
+sha = "315fd6e"

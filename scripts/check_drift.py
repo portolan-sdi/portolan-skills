@@ -79,6 +79,7 @@ UPSTREAMS = {
     "portolan-spec": ("release", "portolan-sdi/portolan-spec"),
     "portolan-catalog-template": ("head", "portolan-sdi/portolan-catalog-template"),
     "portolan-registry": ("head", "portolan-sdi/portolan-registry"),
+    "portolan-browser": ("head", "portolan-sdi/portolan-browser"),
 }
 
 
