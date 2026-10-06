@@ -17,9 +17,26 @@ BASEMAP_OPACITY="${BASEMAP_OPACITY:-0.55}"
 # Do NOT write ${BASEMAP_URL:-https://.../{z}/{x}/{y}.png}. Bash ends the
 # expansion at the first } and silently truncates the template to {z.
 : "${BASEMAP_URL:=}"
-[ -n "$BASEMAP_URL" ] || \
-    BASEMAP_URL='https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png'
 mkdir -p "$WORK"
+
+# No basemap named: find one that actually serves tiles. A provider behind a
+# new API key answers 200 with a placeholder, which a status check cannot
+# see, so pick_basemap.sh probes two distant tiles and compares them. The
+# result is cached for the run, because a batch should not re-probe per
+# collection. Set BASEMAP_URL to skip this entirely.
+if [ "$USE_BASEMAP" = "true" ] && [ -z "$BASEMAP_URL" ]; then
+    if [ -s "$WORK/basemap.url" ]; then
+        BASEMAP_URL=$(cat "$WORK/basemap.url")
+    elif BASEMAP_URL=$(bash "$HERE/pick_basemap.sh"); then
+        printf '%s\n' "$BASEMAP_URL" > "$WORK/basemap.url"
+        echo "basemap: $BASEMAP_URL" >&2
+    else
+        # Every candidate failed. White reads better than a watermark.
+        echo "no basemap reachable; rendering on white" >&2
+        USE_BASEMAP=false
+        BASEMAP_URL=
+    fi
+fi
 
 # Portable size and hash: GNU stat/sha256sum on Linux, BSD stat/shasum on macOS.
 fsize() { stat -c%s "$1" 2>/dev/null || stat -f%z "$1"; }
