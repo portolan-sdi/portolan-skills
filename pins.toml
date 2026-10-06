@@ -10,16 +10,16 @@ version = "0.1.8"
 
 [source-coop-cli]
 # The GitHub release. The Homebrew tap and the installer script give this version.
-version = "v0.2.0"
+version = "v0.3.0"
 
 [portolan-spec]
 tag = "v0.2.0"
 
 [portolan-catalog-template]
-sha = "ed23c3b"
+sha = "fecf42b"
 
 [portolan-registry]
-sha = "9bcfcb2"
+sha = "9308655"
 
 [portolan-browser]
-sha = "315fd6e"
+sha = "9fdf9cb"

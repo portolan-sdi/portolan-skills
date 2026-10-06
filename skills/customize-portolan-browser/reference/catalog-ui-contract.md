@@ -1,4 +1,4 @@
-# What the interface may read from the catalog
+# Catalog fields the interface reads
 
 The catalog is authoritative and immutable in this work. The browser reads it. The browser
 never corrects it.
@@ -8,11 +8,12 @@ shows and classify a defect correctly.
 
 ## Styles and legends
 
-The browser reads styles only when `type` is `Collection`. Item maps and search maps get no
-styles.
+The browser reads styles when `type` is `Collection` or `Feature`. A partitioned collection
+puts one style on each item, because each partition has its own range of values. Catalog
+maps and search maps get no styles.
 
-It discovers a style by filtering collection assets on the `style` role. The default style is
-the asset that carries both `style` and `default` in its `roles`.
+It discovers a style by filtering the assets of that collection or item on the `style` role.
+The default style is the asset that has both `style` and `default` in its `roles`.
 `specs/portolan/core.md` defines this under "Visualization Styles". A legacy
 `portolan:styles` manifest merges with the asset scan. It never replaces it.
 
@@ -23,9 +24,14 @@ whose `version` is not 8 is rejected.
 The style title comes from `asset.title`, and falls back to the asset key with a leading
 `styles/` removed.
 
-A legend comes from the first `fill` layer's `paint['fill-color']`. The browser understands
-two expression forms, `step` and `match`. A plain color string, an `interpolate`, or a `case`
-yields no legend, and the panel hides.
+A legend comes from the `fill-color` of a `fill` layer or the `circle-color` of a `circle`
+layer. The browser tries the layers that draw at the current zoom first, then the others. It
+uses the first layer that gives a legend, and it reads the legend again after each zoom.
+
+The browser understands two expression forms, `step` and `match`. It first resolves a
+`["step", ["zoom"], ...]` wrapper to the ramp for the current zoom. A plain color string, an
+`interpolate`, or a `case` yields no legend. A swatch that is not a color string also yields
+no legend. The panel then hides.
 
 **Classify these as catalog findings.** A collection with no style-role asset falls back to
 default vector layers. That is the first thing to check when a style appears not to apply. A
@@ -38,7 +44,7 @@ The browser prefers TileJSON, then XYZ, then PMTiles. When any tile asset exists
 the PMTiles assets so one tile set loads.
 
 When any tile asset exists, the browser skips direct GeoParquet rendering. GeoParquet renders
-directly only when the collection ships no tiles.
+directly only when the collection has no tile assets.
 
 Detection rules:
 
@@ -49,6 +55,25 @@ Detection rules:
 
 A style source resolves against the style document's own href, so
 `sources.data.url` is the relative path from `styles/` to the data.
+
+## Rasters
+
+The browser decodes each COG in the browser, so the STAC metadata alone sets the color of each
+pixel. `docs/rasters.md` in the browser gives the order of precedence:
+
+1. The `color_hint` of each entry in `classification:classes` on band 1 of the asset.
+2. The first render whose `assets` list holds the asset key.
+3. The first declared render, stretched to the band statistics of the asset.
+4. The `viridis` ramp.
+
+When one class lacks a readable `color_hint` or a numeric `value`, the whole asset falls
+through to the render rules. A categorical raster in the wrong colors, or in `viridis`, has
+incomplete class hints or no render. **That is a catalog finding.**
+
+`docs/layers.md` states which rasters an item opens with and how they stack.
+`portolan:render_order` declares the stack. The Portolan specification does not define that
+field. The browser reads it as a hint. When the default stack is wrong, report that the item
+declares no order. Do not reorder layers in the interface.
 
 ## Size gates
 
@@ -61,7 +86,7 @@ The browser reads declared metadata before it opens a file.
 | `file:size` | Byte size |
 
 The caps are `MAX_ROWS` at 10000 rows, `MAX_MAP_PARQUET_BYTES` at 50 MB, and `COG_LAYER_CAP`
-at 8 overlays.
+at 16 overlays. The layer picker states how many raster assets it could not list.
 
 A missing `file:size` or row count makes the browser open the file to find out. **That is a
 catalog finding.** Fix it in the catalog, not in the interface.
@@ -78,7 +103,7 @@ catalog finding.**
 
 ## Thumbnails
 
-Card thumbnails come from assets and links that carry the `thumbnail` role. The relevant
+Card thumbnails come from assets and links that have the `thumbnail` role. The relevant
 options are `defaultThumbnailSize`, `showThumbnailsAsAssets`, and `crossOriginMedia`.
 
 A thumbnail is a designed view. Frame it for the geometry and the card shape. The framing
@@ -94,7 +119,7 @@ reads `themes[].concepts`, filtered by a publisher scheme URI, and it reads `key
 Write accessors that return empty when a field is absent. A section whose data is absent then
 does not render. Test that behavior, as `tests/unit/stlHome.spec.js` does.
 
-Never key behavior to a collection id. Never hardcode a correction for one metadata value.
+Do not key behavior to a collection id, or hardcode a correction for one metadata value.
 
 ## Options the root catalog sets
 
