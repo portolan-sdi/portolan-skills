@@ -199,7 +199,9 @@ WORK=/tmp/portolan-thumbs bash "$SKILL/scripts/render_one.sh" \
 ```
 
 Pass a format, size, and quality as the third to fifth arguments. `USE_BASEMAP`,
-`BASEMAP_URL`, and `BASEMAP_OPACITY` are environment variables.
+`BASEMAP_URL`, and `BASEMAP_OPACITY` are environment variables. Leave
+`BASEMAP_URL` unset and the script picks one that works. See
+[Basemap Options](#basemap-options).
 
 `buildstyle.py` rewrites the style in memory and never modifies the published
 file. It repoints every source at the local archive through `pmtiles://`. Then
@@ -249,7 +251,7 @@ View every image. Six questions. Any "no" is a failure.
 | Thin or portrait image | Framing was skipped, or `MAX_CONTEXT` capped it. Re-run `frame.py`, then either `--max-context 99` or Strategy B |
 | Sliver of data in a big frame | `fill` is too low. Switch to Strategy B, or crop with a quantile trim |
 | Scattered holes in a continuous fabric | Shrink the window until the render is at or above `max_zoom`. If it already does, the archive needs retiling |
-| Washed out, flat grey | Lower `BASEMAP_OPACITY`, use a no-labels basemap, or raise the fill opacity in the style |
+| Washed out, flat grey | Lower `BASEMAP_OPACITY`, switch to a plainer basemap, or raise the fill opacity in the style |
 | Identical to a sibling | Change strategy, raise the `OFFSET` rank, or change the palette |
 
 Retry at most three times per collection, then report what is left and why. Some
@@ -326,16 +328,53 @@ chiitiler's output format, and `jpg` is an alias for `jpeg`.
 
 ## Basemap Options
 
-| Style | URL |
-|-------|-----|
-| Carto Light (default) | `https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png` |
-| Carto Light, no labels | `https://basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png` |
-| Carto Dark | `https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png` |
+`render_one.sh` picks a basemap for you. Set `BASEMAP_URL` only to override it.
+
+A basemap that moves behind an API key does not fail. It answers 200 with a
+placeholder image, and that image lands in every thumbnail. A status check
+cannot see it, and a file-size floor is guesswork, because a legitimate tile
+over empty terrain is small too. So `pick_basemap.sh` requests two densely
+mapped tiles on opposite sides of the world and compares the bytes. A real
+basemap returns a different image for each. A placeholder returns the same
+one twice, because it is not a map.
+
+```bash
+bash "$SKILL/scripts/pick_basemap.sh" --list   # probe every candidate
+bash "$SKILL/scripts/pick_basemap.sh"          # print the first that works
+```
+
+The result is cached in `$WORK/basemap.url`, so a batch probes once. When no
+candidate answers, the render falls back to a white background, which reads
+better than a watermark.
+
+| Style | URL | Notes |
+|-------|-----|-------|
+| Esri World Light Gray (default) | `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}` | Pale street canvas, built to sit under data |
+| Esri World Dark Gray | `https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}` | For light-coloured data |
+| Esri World Topographic | `https://services.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}` | Terrain and labels; busier |
+| Esri World Imagery | `https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}` | Aerial |
+| OpenStreetMap | `https://tile.openstreetmap.org/{z}/{x}/{y}.png` | See the usage note below |
+
+The Esri tile path is `{z}/{y}/{x}`. Row comes before column, which is the
+reverse of the usual order. Copy the URL rather than assemble it.
+
+**OpenStreetMap is last on purpose.** The
+[Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/)
+forbids systematic or bulk downloading, and a catalog of a few dozen
+collections is bulk. It is a usable fallback for one or two images, not a
+default for a batch. Send a real `User-Agent` if you use it.
+
+Credit whichever basemap you render. Esri's canvas services carry their own
+attribution, and OpenStreetMap requires crediting its contributors. The
+catalog README is the right place for that line.
+
+Carto is gone from this list. Every `basemaps.cartocdn.com` style now returns
+the same 2 kB tile reading "API KEY REQUIRED" for every request, at every
+zoom, worldwide. Set `BASEMAP_CANDIDATES` with your own key if you have one.
 
 `BASEMAP_OPACITY=0.55` keeps the basemap as context. Raise it when sparse data
-needs anchoring. Lower it when pale fills get lost. Use the no-labels variant when
-place names compete with the data. `USE_BASEMAP=false` gives a plain white
-background, which renders faster and makes no external requests.
+needs anchoring. Lower it when pale fills get lost. `USE_BASEMAP=false` gives a
+plain white background, which renders faster and makes no external requests.
 
 ## Troubleshooting
 
@@ -348,5 +387,6 @@ the environment failures.
 | Server will not start | Read `/tmp/chiitiler.log`. When another session holds 13579, export a free `PORT` before both scripts |
 | `curl` reports an empty reply | The worker exited. A `symbol` layer with no `glyphs` endpoint is the usual cause |
 | Basemap not loading | Check network access, and check the log for a truncated `{z` in the requested URL |
+| A watermark across every image | The provider moved behind an API key. Run `pick_basemap.sh --list` and set `BASEMAP_URL` to one that reports `ok` |
 | Render returns 500 | The style is invalid, or a source is unreachable. `/tmp/chiitiler.log` names the cause |
 | New thumbnail not showing in the browser | The asset `href` still points at the old file. See Step 7 |
