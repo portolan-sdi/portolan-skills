@@ -77,6 +77,7 @@ UPSTREAMS = {
     "portolan-cli": ("pypi", "portolan-cli"),
     "rashid": ("pypi", "rashid"),
     "portolan-spec": ("release", "portolan-sdi/portolan-spec"),
+    "source-coop-cli": ("release", "source-cooperative/source-coop-cli"),
     "portolan-catalog-template": ("head", "portolan-sdi/portolan-catalog-template"),
     "portolan-registry": ("head", "portolan-sdi/portolan-registry"),
 }

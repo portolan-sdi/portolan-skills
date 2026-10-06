@@ -8,6 +8,10 @@ version = "0.8.0"
 [rashid]
 version = "0.1.8"
 
+[source-coop-cli]
+# The GitHub release. The Homebrew tap and the installer script give this version.
+version = "v0.2.0"
+
 [portolan-spec]
 tag = "v0.2.0"
 
