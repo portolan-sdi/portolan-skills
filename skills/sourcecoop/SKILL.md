@@ -19,7 +19,7 @@ Source Cooperative serves its object storage through a data proxy at `data.sourc
 source-coop --version
 ```
 
-Install it with Homebrew, or with the installer script the CLI README documents:
+This skill describes version 0.3.0. An older version does not refresh expired credentials. Install it with Homebrew, or with the installer script the CLI README documents:
 
 ```bash
 brew install source-cooperative/tap/source-coop
@@ -53,11 +53,20 @@ s3://{org}/{product}/
 
 ## Step 2: Log in and set the remote
 
-`source-coop login` opens a browser for the OAuth2 authorization code flow. It caches the temporary credentials in the OS keyring:
+`source-coop login` opens a browser for the OAuth2 authorization code flow. It caches the temporary credentials and a refresh token in the OS keyring:
 
 ```bash
 source-coop login
 ```
+
+`login` receives the OAuth2 redirect on a local port. On a machine with no browser, forward a port over SSH and give the same port to `login`:
+
+```bash
+ssh -L 8400:127.0.0.1:8400 user@server
+source-coop login --port 8400
+```
+
+Run the second command on the server. Open the URL that it prints in a local browser.
 
 ### The remote
 
@@ -84,7 +93,7 @@ portolan config list
 eval $(source-coop creds --format env)
 ```
 
-The command sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` in the current shell. Run `portolan push` in that same shell. The credentials expire. When an upload fails with `AccessDenied`, run `source-coop login` and the `eval` line again.
+The command sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` in the current shell. Run `portolan push` in that same shell. The credentials expire, and the shell keeps the old values. When an upload fails with `AccessDenied`, run the `eval` line again. `source-coop creds` uses the cached refresh token to get new credentials. Run `source-coop login` only when the error from `creds` includes `Run 'source-coop login'`.
 
 ### The AWS profile for every other tool
 
@@ -218,7 +227,7 @@ Style files upload with `portolan push` like any other asset. For how many style
 
 The credentials expired, or they do not cover the prefix.
 
-1. Run `source-coop login`, then `eval $(source-coop creds --format env)` in the shell you push from.
+1. Run `eval $(source-coop creds --format env)` again in the shell you push from. When the error from `creds` includes `Run 'source-coop login'`, run `source-coop login` first.
 2. Check that `AWS_SESSION_TOKEN` is set in that shell.
 3. Check that `PORTOLAN_REMOTE` names the organization and the repository you have write access to.
 4. Contact hello@source.coop for access to a different repository.

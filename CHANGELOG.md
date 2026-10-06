@@ -3,7 +3,36 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.4.0 - 2026-09-07
+## 0.5.0 - 2026-10-06
+
+This release moves the four pins that lagged their upstreams. It fixes the
+skills that the moves made wrong (#56).
+
+### Changed
+
+- `pins.toml` moves portolan-catalog-template to `fecf42b`, portolan-registry
+  to `9308655`, portolan-browser to `9fdf9cb`, and source-coop-cli to `v0.3.0`.
+  The template and registry changes alter no fact that a skill states.
+- `customize-portolan-browser` follows portolan-browser `9fdf9cb`. The browser
+  now reads styles on an item as well as on a collection. A legend comes from a
+  `fill` or a `circle` layer, at the current zoom. The COG overlay cap is 16, not
+  8. A new "Rasters" section in `reference/catalog-ui-contract.md` gives the
+  color precedence for a COG and classifies a raster defect. The verification
+  set adds item styles, a categorical raster, and a multi-band scene.
+- `customize-portolan-browser` corrects two statements that were wrong at the
+  old pin too. The browser `README.md` says pnpm, not npm. The
+  `runtime-style.css` reference is a comment in `page.scss`, not in the README.
+- `sourcecoop` follows source-coop-cli 0.3.0. `source-coop creds` refreshes
+  expired credentials from a cached refresh token, so an `AccessDenied` needs
+  only the `eval` line again. The skill adds `source-coop login --port` over an
+  SSH port forward for a machine with no browser.
+
+### Fixed
+
+- `customize-portolan-browser` passes the ai-tells style. The skill merged with
+  35 errors, so the `ai-tells` workflow failed on `main`.
+
+## 0.4.0 - 2026-10-06
 
 ### Added
 
@@ -15,6 +44,24 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   a site-local component. It keeps the catalog immutable, and it sorts every
   finding into the custom browser, the catalog, or upstream portolan-browser.
 - `pins.toml` pins portolan-browser, and `scripts/check_drift.py` tracks it.
+- `.vale.ini` checks `skills/`, `README.md`, and `AGENTS.md` against the
+  ai-tells Vale style v1.33.0. The `ai-tells` workflow and a pre-commit hook run
+  it (#53).
+- `portolan-thumbnails` adds `scripts/pick_basemap.sh`. It requests two tiles
+  on opposite sides of the world and rejects a basemap that returns the same
+  bytes for both. `render_one.sh` calls it when `BASEMAP_URL` is unset (#60).
+
+### Changed
+
+- Every skill passes the ai-tells style. The rewrite removes idioms, metaphors,
+  hype words, and filler (#53).
+- `sourcecoop` uploads through the Source Cooperative data proxy at
+  `data.source.coop`. The `source-coop` CLI issues the credentials, and the
+  remote takes the form `s3://{org}/{product}/`. `pins.toml` pins
+  source-coop-cli.
+- `portolan-thumbnails` drops the Carto basemaps, which now return an
+  "API KEY REQUIRED" tile. The default is Esri World Light Gray (#60).
+- `README.md` installs the plugin on claude.ai through the plugin marketplace.
 
 ## 0.3.0 - 2026-09-07
 

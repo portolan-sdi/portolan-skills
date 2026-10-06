@@ -10,9 +10,9 @@ description: Adapt a portolan-browser checkout into a publisher-branded interfac
 This skill adapts an existing browser to one publisher and one catalog. The result reuses
 the publisher's visual language and words. It stays a working Portolan browser.
 
-Two browsers already follow this shape. `cholmes/stlouis-data-browser` serves the City of
-St. Louis mirror. `cholmes/trimet-data-browser` serves the TriMet mirror. Both keep their
-changes in a small set of files so `git pull upstream main` stays cheap.
+`cholmes/stlouis-data-browser` follows this shape for the City of St. Louis mirror.
+`cholmes/trimet-data-browser` follows it for the TriMet mirror. Both keep their changes in a
+small set of files, so `git pull upstream main` causes few conflicts.
 
 ## Scope
 
@@ -49,7 +49,7 @@ Extract only evidence that changes the interface:
 - the publisher's words for datasets, rows, departments, topics, tags, downloads, and maps;
 - the publisher's page hierarchy and the elements it makes prominent;
 - catalog dimensions that hold enough values to support navigation;
-- real differences between collections, such as geometry type, extent, size, styles,
+- differences between collections, such as geometry type, extent, size, styles,
   legends, metadata richness, and available assets.
 
 Prefer official CSS, design tokens, and reusable assets. Confirm that you may reuse an asset
@@ -110,7 +110,7 @@ you override a string without a code change. Rename the STAC nouns there:
 }
 ```
 
-Three cautions apply. The `catalogs`, `items`, and `search` groups hold their own worded
+Apply these cautions. The `catalogs`, `items`, and `search` groups hold their own worded
 copies of the same nouns, so change those keys too. Repeat every override in each locale
 listed in `supportedLocales`. Each `footerLinks` label resolves as an i18n key first, and
 falls back to the literal text.
@@ -126,7 +126,7 @@ useful ones for a landing page are `root-start`, `root-before-content`, `footer-
 a `component`, plus `props` and an optional `condition`. The `condition` receives
 `{ data, state, getters }`. Use it to limit a widget to the root catalog.
 
-Neither existing fork used this layer. Check it before you write a component.
+The existing forks do not use this layer. Check it before you write a component.
 
 ### Layer 5: the theme
 
@@ -136,10 +136,10 @@ variables. Put every brand value there. Do not paste a hex literal into a compon
 `src/theme/custom.scss` takes anything a variable cannot express. `docs/styling.md` states
 that upstream never changes that file, so it is the safe place for an override.
 
-Two facts matter here. `custom.scss` already hardcodes `#202a4f`, `#343e63`, and `#d4d8e8`,
-which do not follow `$primary`, so a rebrand must edit them. Styling is build time only. The
-`--sb-*` custom properties come from `page.scss`, and `README.md` names a `runtime-style.css`
-that the repository does not contain.
+`custom.scss` already hardcodes `#202a4f`, `#343e63`, and `#d4d8e8`, which do not follow
+`$primary`, so a rebrand must edit them. Styling is build time only. The `--sb-*` custom
+properties come from `page.scss`. A comment there refers to a `runtime-style.css` that the
+repository does not contain.
 
 `index.html` holds the favicon and the web font link as literal text. Edit the file. Only
 `catalogUrl`, `catalogTitle`, and `pathPrefix` are interpolated there.
@@ -155,7 +155,7 @@ search, the sidebar, authentication, and the locale chooser working. Follow that
 
 Name a new file for the publisher, such as `StlHeader.vue`. Keep data-derived behavior
 generic. Read catalog metadata. Never key behavior to a collection id, and never correct a
-particular metadata value in the interface.
+metadata value in the interface.
 
 Do not build a second frontend. Do not replace portolan-browser with a new application.
 
@@ -176,8 +176,8 @@ A homepage screenshot is not verification. Read `reference/verification.md`. Cop
 `reference/verify-template.mjs` into the repository as `verify-<publisher>.mjs` and fill in
 the publisher assertions.
 
-The repository holds no screenshot baselines and no mobile viewport, so your script must set
-both viewports itself. Run the repository gates as well:
+The repository contains no screenshot baselines and tests no mobile viewport, so your script
+must set both viewports itself. Run the repository checks as well:
 
 ```bash
 pnpm run lint
@@ -197,15 +197,16 @@ every finding, and describe what you observed. Do not write "some legends are br
    data, or tiling, upstream of the interface.
 3. **Generic browser findings.** Problems that belong in a `portolan-browser` issue or patch.
 
-The third list has precedent. TriMet's layer order fix now lives upstream as
+The third list has precedent. TriMet's layer order fix is now upstream as
 `StacMapLayer._addLayerBelowLabels`, with `tests/unit/layerOrder.spec.js`. The St. Louis
-parquet table pagination now lives upstream as `tests/unit/parquetTable.spec.js`. Report the
+parquet table pagination is now upstream as `tests/unit/parquetTable.spec.js`. Report the
 finding. Wait for approval before you touch the upstream repository.
 
 ## Repository rules
 
-- The toolchain is pnpm. `CONTRIBUTING.md` and `README.md` still say npm, and every workflow
-  uses `pnpm install --frozen-lockfile`.
+- The toolchain is pnpm. The `checks`, `playwright`, and `deploy-demo` workflows run
+  `pnpm install --frozen-lockfile`. `CONTRIBUTING.md`, `docs/widgets.md`, and two minor
+  workflows still use npm.
 - `portolan-browser` is ISC, not Apache-2.0. A derived browser keeps that license.
 - Never edit `CLAUDE.md`, or the `ops-sync` block of `AGENTS.md`. The next sync overwrites
   both. Put repository rules below the block in `AGENTS.md`.
