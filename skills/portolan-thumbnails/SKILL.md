@@ -331,7 +331,7 @@ chiitiler's output format, and `jpg` is an alias for `jpeg`.
 `render_one.sh` picks a basemap for you. Set `BASEMAP_URL` only to override it.
 
 A basemap that moves behind an API key does not fail. It answers 200 with a
-placeholder image, and that image lands in every thumbnail. A status check
+placeholder image, and the renderer uses that image in every thumbnail. A status check
 cannot see it, and a file-size floor is guesswork, because a legitimate tile
 over empty terrain is small too. So `pick_basemap.sh` requests two densely
 mapped tiles on opposite sides of the world and compares the bytes. A real
@@ -360,7 +360,7 @@ reverse of the usual order. Copy the URL rather than assemble it.
 
 **OpenStreetMap is last on purpose.** The
 [Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/)
-forbids systematic or bulk downloading, and a catalog of a few dozen
+prohibits systematic or bulk downloading, and a catalog of a few dozen
 collections is bulk. It is a usable fallback for one or two images, not a
 default for a batch. Send a real `User-Agent` if you use it.
 
