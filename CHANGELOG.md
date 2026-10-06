@@ -3,6 +3,19 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.4.0 - 2026-09-07
+
+### Added
+
+- `customize-portolan-browser` adapts a portolan-browser checkout into a
+  publisher-branded interface for one existing Portolan catalog. The skill
+  inspects the catalog, the browser, and the publisher site, presents a design
+  proposal, and stops for approval. It then implements the proposal through the
+  browser's own configuration, locale, widget, and theme layers before it writes
+  a site-local component. It keeps the catalog immutable, and it sorts every
+  finding into the custom browser, the catalog, or upstream portolan-browser.
+- `pins.toml` pins portolan-browser, and `scripts/check_drift.py` tracks it.
+
 ## 0.3.0 - 2026-09-07
 
 This release rewrites every skill against specification v0.2.0, portolan-cli

@@ -80,6 +80,7 @@ UPSTREAMS = {
     "source-coop-cli": ("release", "source-cooperative/source-coop-cli"),
     "portolan-catalog-template": ("head", "portolan-sdi/portolan-catalog-template"),
     "portolan-registry": ("head", "portolan-sdi/portolan-registry"),
+    "portolan-browser": ("head", "portolan-sdi/portolan-browser"),
 }
 
 
