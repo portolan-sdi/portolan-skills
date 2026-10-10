@@ -30,7 +30,7 @@ You also need a Source Cooperative account with write access to the repository. 
 ## Workflow Overview
 
 1. Gather the organization and product names.
-2. Log in with `source-coop` and set the remote in `.env`.
+2. Log in with `source-coop`, add the AWS profile, and set the remote in `.env`.
 3. Initialize the catalog with a license.
 4. Add files.
 5. Write metadata: contact, license, providers, `source_url`.
@@ -72,7 +72,44 @@ Run the second command on the server. Open the URL that it prints in a local bro
 
 The remote is the destination that `portolan push` writes to. The proxy addresses the account as the bucket and the repository as the key prefix. `portolan push` reads the destination from `PORTOLAN_REMOTE` when you give it no argument.
 
-The CLI refuses to store `remote`, `profile`, `region`, and `s3_endpoint` in `.portolan/config.yaml`. That file is pushed with the catalog. Put the remote and the endpoint in `.env` at the catalog root:
+The CLI refuses to store `remote`, `profile`, `region`, and `s3_endpoint` in `.portolan/config.yaml`. That file is pushed with the catalog. Put the remote and the profile name in `.env` at the catalog root:
+
+```bash
+cat > .env << 'EOF'
+PORTOLAN_REMOTE=s3://{org}/{product}/
+PORTOLAN_PROFILE=source-coop
+EOF
+
+portolan config list
+```
+
+### The AWS profile
+
+`portolan push`, the aws CLI, boto3, rclone, and DuckDB read `~/.aws/config`. Add this profile once. The [Source Cooperative docs](https://docs.source.coop/upload-with-the-cli) give the same profile:
+
+```ini
+[profile source-coop]
+credential_process = source-coop creds
+endpoint_url = https://data.source.coop
+```
+
+`endpoint_url` sends every request to the proxy. botocore runs `source-coop creds` when the credentials expire, so a long push does not fail on an expired token. Use the same profile to list the prefix and to confirm what the push wrote:
+
+```bash
+aws s3 ls s3://{org}/{product}/ --profile source-coop
+```
+
+`portolan push` reads `credential_process` only with the `aws` extra. The extra is in the portolan-cli releases after 0.8.0:
+
+```bash
+pip install 'portolan-cli[aws]'
+```
+
+Without the extra, the push finds no credentials. It then falls back to the instance metadata service at `169.254.169.254`.
+
+### portolan-cli 0.8.0 and earlier
+
+These versions do not run `credential_process`, and they do not read `endpoint_url`. Set the endpoint in `.env`, and export the credentials in the shell you push from:
 
 ```bash
 cat > .env << 'EOF'
@@ -80,40 +117,10 @@ PORTOLAN_REMOTE=s3://{org}/{product}/
 PORTOLAN_S3_ENDPOINT=data.source.coop
 EOF
 
-portolan config list
-```
-
-`PORTOLAN_S3_ENDPOINT` sends every request to the proxy with path-style addressing. Without it, the CLI resolves the bucket against AWS.
-
-### Credentials for portolan push
-
-`source-coop creds --format env` prints the `export` lines that `portolan push` reads:
-
-```bash
 eval $(source-coop creds --format env)
 ```
 
-The command sets `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` in the current shell. Run `portolan push` in that same shell. The credentials expire, and the shell keeps the old values. When an upload fails with `AccessDenied`, run the `eval` line again. `source-coop creds` uses the cached refresh token to get new credentials. Run `source-coop login` only when the error from `creds` includes `Run 'source-coop login'`.
-
-### The AWS profile for every other tool
-
-The aws CLI, boto3, rclone, and DuckDB read `~/.aws/config`. Add this profile once to point them at the proxy:
-
-```ini
-[profile source]
-credential_process = source-coop creds
-endpoint_url = https://data.source.coop
-```
-
-```bash
-aws s3 ls s3://{org}/{product}/ --profile source
-```
-
-botocore runs `source-coop creds` on each call, so this profile refreshes itself. Use it to list the prefix and to confirm what the push wrote.
-
-`portolan push` reads the profile name, but it looks only in `~/.aws/credentials` for a key pair. It does not run `credential_process`, and it does not read `endpoint_url`. From `~/.aws/config` it reads only `region`. Do not set `PORTOLAN_PROFILE=source`. A profile name other than `default` also discards the environment credentials that the `eval` line set. The push then finds no key pair and falls back to the instance metadata service at `169.254.169.254`.
-
-portolan-sdi/portolan-cli#872 tracks `credential_process` support in the CLI. Use the `eval` line above until a release includes it.
+Do not set `PORTOLAN_PROFILE` with these versions. A profile name other than `default` discards the credentials that the `eval` line set. The credentials expire, and the shell keeps the old values. When an upload fails with `AccessDenied`, run the `eval` line again.
 
 ## Step 3: Initialize Catalog
 
@@ -227,8 +234,8 @@ Style files upload with `portolan push` like any other asset. For how many style
 
 The credentials expired, or they do not cover the prefix.
 
-1. Run `eval $(source-coop creds --format env)` again in the shell you push from. When the error from `creds` includes `Run 'source-coop login'`, run `source-coop login` first.
-2. Check that `AWS_SESSION_TOKEN` is set in that shell.
+1. Run `source-coop creds`. When its error includes `Run 'source-coop login'`, run `source-coop login`.
+2. Check that `PORTOLAN_PROFILE` names the profile that runs `source-coop creds`.
 3. Check that `PORTOLAN_REMOTE` names the organization and the repository you have write access to.
 4. Contact hello@source.coop for access to a different repository.
 
@@ -264,10 +271,9 @@ cd ~/data/phl-aerial-imagery
 portolan init --title "Philadelphia Aerial Imagery" --auto --license CC-BY-4.0
 cat > .env << 'EOF'
 PORTOLAN_REMOTE=s3://nlebovits/phl-aerial-imagery/
-PORTOLAN_S3_ENDPOINT=data.source.coop
+PORTOLAN_PROFILE=source-coop
 EOF
 source-coop login
-eval $(source-coop creds --format env)
 portolan add . --pmtiles
 portolan metadata init
 # Edit .portolan/metadata.yaml: contact, license, providers, source_url
