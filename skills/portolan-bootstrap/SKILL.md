@@ -214,7 +214,7 @@ https://example.gov/csb/submit        <- renders as text
 File a new [service request](https://example.gov/csb/submit).
 ```
 
-Mention the agent guide in the prose with an inline [AGENTS.md](AGENTS.md) link. A trailing "Start at the catalog agent guide" reads as boilerplate and gets skipped.
+Mention the agent guide in the prose with an inline `[AGENTS.md](AGENTS.md)` link. A trailing "Start at the catalog agent guide" reads as boilerplate and gets skipped.
 
 Call the browser page the "data browser" or the "interactive data page". It is not an "interactive map". It is also where a reader downloads the data. The same page shows the license, the schema, and the outbound links.
 
