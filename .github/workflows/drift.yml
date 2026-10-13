@@ -43,13 +43,12 @@ jobs:
 
       - name: Install the pinned upstreams
         run: |
-          CLI=$(python3 -c 'import tomllib;print(tomllib.load(open("pins.toml","rb"))["portolan-cli"]["version"])')
           RASHID=$(python3 -c 'import tomllib;print(tomllib.load(open("pins.toml","rb"))["rashid"]["version"])')
           uv venv .venv
           uv pip install --python .venv/bin/python \
-            "portolan-cli==$CLI" "rashid==$RASHID" \
+            "rashid==$RASHID" \
             pytest httpx pyyaml click
-          echo "cli=$CLI rashid=$RASHID"
+          echo "rashid=$RASHID; the checker installs the pinned CLI separately"
 
       - name: Test the checker
         run: .venv/bin/python -m pytest tests -q

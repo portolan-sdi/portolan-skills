@@ -585,6 +585,33 @@ def load_ptl_ids() -> set[str] | None:
     return set(registry.CHECKS)
 
 
+def check_cli_isolated(root: Path, version: str) -> list[Finding]:
+    """Check the CLI in its own environment, with its supported rashid."""
+    result = subprocess.run([
+        "uv", "run", "--quiet", "--with", f"portolan-cli=={version}",
+        "--script", str(Path(__file__).resolve()), "--no-bootstrap",
+        "--cli-only", "--root", str(root),
+    ], capture_output=True, text=True)
+    if result.returncode:
+        return [Finding(root / "pins.toml", 1, "cli-environment", result.stderr.strip())]
+    return [Finding(root / row["path"], row["line"], row["check"], row["message"])
+            for row in json.loads(result.stdout)]
+
+
+def cli_findings(root: Path) -> list[Finding]:
+    cli = load_click_root(CLICK_ROOTS["portolan"])
+    findings = []
+    for path in sorted((root / "skills").glob("*/SKILL.md")):
+        for block in parse_skill(path).blocks:
+            commands, _ = extract_commands(block)
+            if block.skipped:
+                continue
+            for command in commands:
+                if command.name == "portolan":
+                    findings.extend(check_click_command(command, cli, "cli"))
+    return findings
+
+
 def run(root: Path, offline: bool, mode: str) -> int:
     pins = tomllib.loads((root / "pins.toml").read_text())
     skills = [parse_skill(p) for p in sorted((root / "skills").glob("*/SKILL.md"))]
@@ -598,7 +625,10 @@ def run(root: Path, offline: bool, mode: str) -> int:
         try:
             roots[name] = load_click_root(spec)
         except ImportError:
-            notes.append(f"{name} is not installed, command checks skipped")
+            if name == "portolan" and shutil.which("uv"):
+                findings.extend(check_cli_isolated(root, pins["portolan-cli"]["version"]))
+            else:
+                notes.append(f"{name} is not installed, command checks skipped")
     gh = GhHelp()
     if not gh.available:
         notes.append("gh is not installed, gh checks skipped")
@@ -655,28 +685,25 @@ def run(root: Path, offline: bool, mode: str) -> int:
 
 
 def bootstrap(root: Path, argv: list[str]) -> None:
-    """Re-run under `uv run --with` so the pinned CLI and rashid import.
+    """Re-run under `uv run --with` so the pinned rashid imports.
 
     `uv run scripts/check_drift.py` resolves only the inline dependencies.
-    The command checks need portolan-cli and rashid at the versions in
-    pins.toml, so when either import fails this re-executes the script with
-    those packages added. The environment flag stops a second hop.
+    When rashid is absent, re-execute with its pins.toml version added.
+    The CLI runs in a separate environment because its rashid constraint
+    can exclude the validator pin. The environment flag stops a second hop.
     """
     if os.environ.get("CHECK_DRIFT_BOOTSTRAPPED") or shutil.which("uv") is None:
         return
     try:
-        importlib.import_module("portolan_cli")
         importlib.import_module("rashid.registry")
         return
     except ImportError:
         pass
     pins = tomllib.loads((root / "pins.toml").read_text())
-    cli = pins["portolan-cli"]["version"]
     rashid = pins["rashid"]["version"]
     env = dict(os.environ, CHECK_DRIFT_BOOTSTRAPPED="1")
     cmd = [
         "uv", "run", "--quiet",
-        "--with", f"portolan-cli=={cli}",
         "--with", f"rashid=={rashid}",
         "--script", str(Path(__file__).resolve()),
         *argv,
@@ -688,10 +715,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--offline", action="store_true", help="skip network checks; use the cache when present")
     parser.add_argument("--mode", choices=["pr", "cron"], default="pr", help="cron makes pin-currency blocking")
+    parser.add_argument("--cli-only", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--no-bootstrap", action="store_true", help="do not re-run under uv with the pinned tools")
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args(argv)
     root = args.root.resolve()
+    if args.cli_only:
+        print(json.dumps([{"path": str(f.path.relative_to(root)), "line": f.line,
+                           "check": f.check, "message": f.message}
+                          for f in cli_findings(root)]))
+        return 0
     if not args.no_bootstrap:
         bootstrap(root, sys.argv[1:] if argv is None else argv)
     return run(root, args.offline, args.mode)
