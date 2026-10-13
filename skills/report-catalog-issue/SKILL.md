@@ -47,13 +47,19 @@ If the script exits 1, stop. The catalog is not in the registry, so there is nob
 
 The report is worth nothing without evidence. Run a command against the live catalog and keep both the command and its output.
 
-The validator is the first source of evidence when you hold a local copy of the catalog. It ties each finding to a spec rule id, which the catalog owner can look up. `rashid check` takes a directory rather than a URL. `portolan check` gives the same evidence inside a catalog the CLI manages.
+The validator is the first source of evidence when you hold a local copy of the catalog. It ties each finding to a spec rule id, which the catalog owner can look up. `rashid check` accepts a local path or the HTTPS URL of a published catalog. `portolan check` gives the same evidence inside a catalog the CLI manages.
 
 ```bash
-uvx --from 'rashid>=0.1.8,<0.2.0' rashid check ./catalog --summary
+uvx --from 'rashid>=0.3.0,<0.4.0' rashid check ./catalog --summary
 ```
 
-For a catalog you only reach by URL, fetch the object and show the field. Use `curl` and `jq` for metadata and DuckDB for the data itself.
+For a published catalog, run rashid against its URL. It follows catalog links and runs the live checks automatically.
+
+```bash
+uvx --from 'rashid>=0.3.0,<0.4.0' rashid check "$CATALOG_URL" --summary
+```
+
+Fetch an individual object to show the field. Use `curl` and `jq` for metadata and DuckDB for the data itself.
 
 ```bash
 curl -fsSL https://data.source.coop/nlebovits/pergamino-ide/catalog.json \

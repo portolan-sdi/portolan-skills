@@ -22,10 +22,11 @@ CI extracts everything else by crawling the catalog: title, description, bbox, l
 
 ## Step 1: Validate the catalog
 
-The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Run the validator on the local tree before you register the published copy. `rashid check` takes a directory rather than a URL.
+The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Check the local tree first, then check the published URL before registration. `rashid check` accepts a local path or the HTTPS URL of a published catalog.
 
 ```bash
-uvx --from 'rashid>=0.1.8,<0.2.0' rashid check ./catalog --summary
+uvx --from 'rashid>=0.3.0,<0.4.0' rashid check ./catalog --summary
+uvx --from 'rashid>=0.3.0,<0.4.0' rashid check "$CATALOG_URL" --summary
 curl -fsSL "$CATALOG_URL" | jq '{type, id, stac_extensions}'
 ```
 
@@ -77,7 +78,7 @@ the registry export and on the website.
 ## Verification
 
 ```
-$ uvx --from 'rashid>=0.1.8,<0.2.0' rashid check ./catalog --summary
+$ uvx --from 'rashid>=0.3.0,<0.4.0' rashid check ./catalog --summary
 OK: 14 files checked, no findings.
 $ curl -fsSL https://data.source.coop/nlebovits/pergamino-ide/catalog.json | jq -c '{type, id}'
 {"type":"Catalog","id":"pergamino-ide"}
@@ -110,7 +111,7 @@ The title is in conventional-commit form because squash-merge makes it the commi
 
 ## Step 5: Report
 
-Give the user the PR URL. The `Validate Catalogs` workflow crawls the catalog. An entries-only PR merges on its own when that workflow passes. After the merge, `publish.yml` opens a bot PR that updates `exports/catalogs.json`.
+Give the user the PR URL. The `Validate Catalogs` workflow mirrors new catalog metadata and runs rashid and stac-node-validator. Changes to current entries require a maintainer approval of the head commit. A PR that only adds new entries merges on its own when that workflow passes. After the merge, `publish.yml` opens a bot PR that updates `exports/catalogs.json`.
 
 ## Alternative: web submission
 

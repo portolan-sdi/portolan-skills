@@ -176,7 +176,7 @@ Where rashid and the spec disagree, the spec decides. File the disagreement agai
 
 ### Pin the version
 
-The catalog template's `tests/test_conformance.py` runs whatever `rashid` is on `PATH`. It fails when rashid is absent or outside `>=0.1.5,<0.2.0`, and its `docs/conformance.md` says why. Install the pinned version into a repository virtualenv and pin the same version in CI.
+The catalog template's `tests/test_conformance.py` runs whatever `rashid` is on `PATH`. It fails when rashid is absent or outside `>=0.1.8,<0.2.0`, and its `docs/conformance.md` says why. For rashid 0.3.0, update that gate to `>=0.3.0,<0.4.0`, including its minimum and maximum version tuples. Install the pinned version into a repository virtualenv and pin the same version in CI.
 
 Then check which one you are invoking. `portolan check` imports rashid from the CLI's own environment, while a bare `rashid check` uses whatever is on `PATH`. They are routinely different versions on the same machine. Re-running with a newer validator and getting an identical error count is a finding. It can mean the rules you care about never ran.
 

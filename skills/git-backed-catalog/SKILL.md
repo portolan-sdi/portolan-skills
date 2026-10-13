@@ -52,15 +52,15 @@ These two guards stop you, and both are deliberate:
 
 ### Declare the current schema version
 
-The template at `ed23c3b` declares `https://schemas.portolan-sdi.org/portolan/v0.1.1/schema.json` in `catalog/catalog.json`. Change it to the v0.2.0 URI before you add anything (PORTO-CORE-006). Every object in the tree declares the same URI (PORTO-CORE-009). A v0.1.1 catalog that carries an absolute `self` link fails validation, because v0.1.1 forbids that link and v0.2.0 recommends it (PORTO-CORE-081).
+The pinned template declares `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json` in `catalog/catalog.json` (PORTO-CORE-006). Every object in the tree declares the same URI (PORTO-CORE-009). A v0.1.1 catalog that carries an absolute `self` link fails validation, because v0.1.1 forbids that link and v0.2.0 recommends it (PORTO-CORE-081).
 
 ### Raise the validator floor in the gate
 
-`tests/test_conformance.py` fails when `rashid` is absent or outside its version range. The template hard-codes `MIN_VERSION = (0, 1, 5)` and `SPEC = "rashid>=0.1.5,<0.2.0"`. Raise both to `0.1.8`, which is the first version that accepts a v0.2.0 root `self` link. Install the same version into a repository virtualenv, so the version the tests find is the version CI installs:
+`tests/test_conformance.py` fails when `rashid` is absent or outside its version range. The template sets `MIN_VERSION = (0, 1, 8)` and `SPEC = "rashid>=0.1.8,<0.2.0"`. To use the pinned rashid 0.3.0, set `MIN_VERSION = (0, 3, 0)`, `MAX_VERSION = (0, 4, 0)`, and `SPEC = "rashid>=0.3.0,<0.4.0"`. Install the same version into a repository virtualenv, so the version the tests find is the version CI installs:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install 'rashid>=0.1.8,<0.2.0'
+.venv/bin/pip install 'rashid>=0.3.0,<0.4.0'
 .venv/bin/rashid --version
 ```
 
@@ -111,7 +111,7 @@ These six points matter:
 * **Edit the generator, not generated output.** If the repository has a `tools/` pipeline, change the source of the generated catalog.
 * **Do not widen the conformance allow-list to make CI pass.** Adding a finding to `ACCEPTED` in `tests/test_conformance.py` hides a defect in the catalog. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing omits `Content-Type`, so change detection does not notice.
-* **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` at `ed23c3b` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
+* **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 
 ## Mode C: contribute to someone else's catalog
 

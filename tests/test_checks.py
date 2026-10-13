@@ -114,3 +114,41 @@ def test_end_to_end_fixture(drift, fixtures, fake_cli, monkeypatch):
     assert "--also-nope" not in text
     assert "skills/good/SKILL.md" not in text
     assert "3 findings" in text
+
+
+def test_isolated_cli_reports_findings(drift, tmp_path, monkeypatch):
+    """The subprocess preserves CLI diagnostics and installs only the CLI pin."""
+    import json
+    import subprocess
+
+    calls = []
+
+    def run(argv, **kwargs):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, json.dumps([{
+            "path": "skills/example/SKILL.md", "line": 12,
+            "check": "cli-flag", "message": "--unknown is not accepted",
+        }]), "")
+
+    monkeypatch.setattr(drift.subprocess, "run", run)
+    findings = drift.check_cli_isolated(tmp_path, "0.8.0")
+    assert calls[0][calls[0].index("--with") + 1] == "portolan-cli==0.8.0"
+    assert not any("rashid==" in arg for arg in calls[0])
+    assert "--no-bootstrap" in calls[0]
+    assert "--cli-only" in calls[0]
+    assert findings[0].path == tmp_path / "skills/example/SKILL.md"
+    assert findings[0].line == 12
+    assert findings[0].check == "cli-flag"
+    assert findings[0].blocking
+
+
+def test_isolated_cli_failure_blocks(drift, tmp_path, monkeypatch):
+    """An environment failure cannot turn the CLI checks into a clean run."""
+    import subprocess
+
+    monkeypatch.setattr(drift.subprocess, "run", lambda argv, **kwargs:
+                        subprocess.CompletedProcess(argv, 1, "", "resolution failed"))
+    findings = drift.check_cli_isolated(tmp_path, "0.8.0")
+    assert findings[0].check == "cli-environment"
+    assert findings[0].blocking
+    assert findings[0].message == "resolution failed"
