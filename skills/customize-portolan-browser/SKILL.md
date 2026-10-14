@@ -122,7 +122,7 @@ hooks. `docs/widgets.md` lists them, and `pnpm run docs:hooks` regenerates that 
 useful ones for a landing page are `root-start`, `root-before-content`, `footer-start`,
 `view-catalog-meta-start`, `view-catalog-catalogs-start`, and `view-catalog-items-end`.
 
-`src/widgets/` ships `AlertBox`, `CustomText`, and `Featured`. A definition takes an `id` or
+`src/widgets/` ships `AlertBox`, `CustomText`, `ExternalWarning`, and `Featured`. A definition takes an `id` or
 a `component`, plus `props` and an optional `condition`. The `condition` receives
 `{ data, state, getters }`. Use it to limit a widget to the root catalog.
 
@@ -205,8 +205,8 @@ finding. Wait for approval before you touch the upstream repository.
 ## Repository rules
 
 - The toolchain is pnpm. The `checks`, `playwright`, and `deploy-demo` workflows run
-  `pnpm install --frozen-lockfile`. `CONTRIBUTING.md`, `docs/widgets.md`, and two minor
-  workflows still use npm.
+  `pnpm install --frozen-lockfile`. The `codegen-integration` and `fix-i18n` workflows do too.
+  `CONTRIBUTING.md` uses pnpm. `docs/widgets.md` still shows npm examples.
 - `portolan-browser` is ISC, not Apache-2.0. A derived browser keeps that license.
 - Never edit `CLAUDE.md`, or the `ops-sync` block of `AGENTS.md`. The next sync overwrites
   both. Put repository rules below the block in `AGENTS.md`.
