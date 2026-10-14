@@ -2,7 +2,7 @@
 
 AI agent skills for working with [Portolan](https://github.com/portolan-sdi/portolan-spec) cloud-native geospatial data catalogs.
 
-Skills use the [Agent Skills](https://github.com/anthropics/agent-skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
+Skills use the [Agent Skills](https://github.com/anthropics/skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
 
 The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
 

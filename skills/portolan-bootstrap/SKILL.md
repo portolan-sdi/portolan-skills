@@ -23,7 +23,7 @@ Read an exemplar before you start. [portolan-nl](https://source.coop/cholmes/por
 
 The [spec](https://github.com/portolan-sdi/portolan-spec) is the standard. The CLI implements it and is one way to get there, not the definition of done. Where a better tool fits a step, use it:
 
-- [gpio](https://github.com/developmentseed/geoparquet-io) for conversion and spatial sorting
+- [gpio](https://github.com/geoparquet/geoparquet-io) for conversion and spatial sorting
 - tippecanoe directly for tiling options the CLI does not expose
 - DuckDB for profiling a column before you style it
 
