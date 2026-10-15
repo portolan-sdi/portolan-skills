@@ -1,0 +1,95 @@
+name: Docs check
+
+# Runs every SQL block and every claim check in the catalog docs against the
+# published data. See tests/test_queries.py.
+#
+# CI runs the same check on each pull request. This workflow catches the
+# other cause of drift: the data or its source changes while the docs stay
+# the same. A failure opens one issue, or comments on the open one. A pass
+# closes it.
+
+on:
+  schedule:
+    - cron: "23 6 * * 1"  # Mondays. Run daily if the data changes daily.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      failed: ${{ steps.run.outputs.failed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install DuckDB
+        run: python -m pip install duckdb==1.5.6
+
+      - name: Run the documented queries and claim checks
+        id: run
+        run: |
+          set +e
+          python tests/test_queries.py --report report.md
+          code=$?
+          set -e
+          echo "failed=$([ $code -ne 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          [ -f report.md ] && cat report.md >> "$GITHUB_STEP_SUMMARY"
+          exit $code
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: docs-check-report
+          path: report.md
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # The only job that can write issues. It runs no repository code.
+  report:
+    needs: check
+    if: always() && needs.check.outputs.failed != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.check.outputs.failed == 'true'
+        with:
+          name: docs-check-report
+
+      - name: Open, update, or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          FAILED: ${{ needs.check.outputs.failed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Documented queries or claims fail against the published data"
+          number=$(gh issue list --state open --search "in:title \"$title\"" \
+            --json number --jq '.[0].number // empty')
+          if [ "$FAILED" = "true" ]; then
+            { echo "Run: $RUN_URL"; echo
+              cat report.md 2>/dev/null || echo "The check wrote no report. Read the run log."
+            } > body.md
+            if [ -n "$number" ]; then
+              gh issue comment "$number" --body-file body.md
+            else
+              gh issue create --title "$title" --body-file body.md
+            fi
+          elif [ -n "$number" ]; then
+            gh issue close "$number" --comment "The checks pass again. Run: $RUN_URL"
+          fi

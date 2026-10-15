@@ -3,6 +3,16 @@
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- `git-backed-catalog` adds a check that runs every SQL block in the catalog
+  docs against the published data, and a `claim-check` comment that tests a
+  stated fact about the data. CI runs the check on each pull request, and a
+  scheduled workflow runs it every week. A failed run opens one tracking issue
+  (#33).
+
 ## 0.5.0 - 2026-10-06
 
 This release moves the four pins that lagged their upstreams. It fixes the
