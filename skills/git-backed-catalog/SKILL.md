@@ -12,7 +12,7 @@ A git-backed catalog keeps its metadata in a repository and its data in object s
 This pattern is useful for three reasons:
 
 * **Rollback.** Git keeps every previous version of the catalog and the changes between them.
-* **A validation loop.** CI runs `rashid` on every pull request. Edit, validate, fix, and repeat until the checks pass.
+* **A validation loop.** CI runs `rashid` on every pull request. Edit, validate, fix, and repeat until the checks pass. A scheduled run checks that the documented queries still work on the published data.
 * **A contribution path.** Someone who finds a wrong license can open a pull request instead of hunting for a contact address.
 
 See the [git-backed catalogs guidance](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/git-backed-catalogs.md) for the background and tradeoffs. The specification is ground truth. `rashid` implements it.
@@ -97,6 +97,24 @@ Its change detection compares a multipart object by size alone. Pass `--force` a
 
 A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally, so the full check runs where the bytes are.
 
+### Test the documented queries and claims
+
+Write this check for every git-backed catalog, because the template does not include it.
+
+The Markdown under `catalog/` gives readers queries and states facts about the data. The data can change after the docs are written. If the source renames a column, the docs become wrong although nobody edited the repository. A scheduled check finds the change before a reader does.
+
+The docs are the only copy of each query. The check reads the queries from the docs and does not keep its own list. It must do these things:
+
+* Run each query block as a reader would paste it, against the published URLs. A query against a local path tests nothing that a reader gets.
+* Fail when a block errors or returns no rows. An empty result usually means a renamed category or a filter that no longer matches. Mark a block whose empty result is correct, and a fragment that is not a full query, on the line before its fence.
+* Run each claim check. A claim about the data gets a check query next to it, such as in an HTML comment. The query returns the rows that break the claim, so no rows means the claim is true.
+* Run in CI on each pull request, on a schedule, and after each upload of data. Match the schedule to how often the source changes.
+* On a scheduled failure, open one issue or comment on the open one. Close it on the next pass. Give the write permission for issues only to the job that does this.
+
+Pick the engine, the setup, and the schedule to suit the data. [phl-housing-demo](https://github.com/nlebovits/phl-housing-demo) is a worked example: `tests/test_queries.py` runs the SQL blocks with DuckDB, and `.github/workflows/refresh.yml` runs them after each refresh.
+
+Do not quote a row count or a percentage from the data. It goes stale at the next update. Give the query that measures it.
+
 ## Mode B: maintain an existing catalog
 
 The loop is:
@@ -108,12 +126,13 @@ python3 tools/publish.py             # dry run
 python3 tools/publish.py --confirm   # upload; needs AWS credentials
 ```
 
-These six points matter:
+These seven points matter:
 
 * **Publishing never deletes.** Removing a file from `catalog/` does not remove the object from the bucket. Delete the object separately when that is intended.
 * **`portolan push` and `tools/publish.py` do not interoperate.** `portolan push` tracks uploads in `versions.json`, a CLI artifact keyed on sha256. The template's `tools/publish.py` keeps no state and compares local size and MD5 against the bucket listing. Pick one per catalog and say which in the repository's `AGENTS.md`.
 * **Edit the generator, not generated output.** If the repository has a `tools/` pipeline, change the source of the generated catalog.
 * **Do not widen the conformance allow-list to make CI pass.** Adding a finding to `ACCEPTED` in `tests/test_conformance.py` hides a defect in the catalog. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
+* **A docs-check issue means the data and the docs disagree.** Find out which one changed. Fix the doc, or fix the data if the change was a mistake. Do not delete a check or mark it as skipped to make the run pass.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing omits `Content-Type`, so change detection does not notice.
 * **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 
