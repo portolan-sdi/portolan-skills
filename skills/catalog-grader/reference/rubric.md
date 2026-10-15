@@ -116,7 +116,7 @@ This area covers thumbnails, styles, and the first view. View each saved thumbna
 
 This area covers whether a reader can find things in the tree. See philosophy.md.
 
-- **A.** One dataset per collection. Related collections sit in sub-catalogs when a level has many children, grouped by steward or by the publisher's own topics. Depth is uniform. Ids are short, lowercase, and free of pipeline artifacts. Titles describe.
+- **A.** One dataset per collection. Related collections sit in sub-catalogs when a level has many children, grouped by data owner or by the publisher's own topics. Depth is uniform. Ids are short, lowercase, and free of pipeline artifacts. Titles describe.
 - **B.** One odd grouping, or an id that contains a pipeline artifact.
 - **D.** Several datasets packed into one collection as sibling assets, a long flat list a reader cannot scan, or a taxonomy the grader cannot follow.
 

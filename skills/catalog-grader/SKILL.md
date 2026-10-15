@@ -1,11 +1,11 @@
 ---
 name: catalog-grader
-description: Grade a published Portolan catalog from A+ to F on what the validator cannot check. Collect the checkable facts with a script, read every document and thumbnail, find invented or drift-prone claims, and write a JSON report in which every finding quotes its evidence. Use when someone asks to grade, rate, score, audit, or review the quality of a Portolan catalog, or when a registry submission needs a quality review.
+description: Grade a published Portolan catalog from A+ to F on honesty, documentation, access, visuals, organization, maintenance, and concision. Collect the checkable facts with a script, read every document and thumbnail, find invented or drift-prone claims, and write a JSON report in which every finding quotes its evidence. Use when someone asks to grade, rate, score, audit, or review the quality of a Portolan catalog, or when a registry submission needs a quality review.
 ---
 
 <!-- drift: depends-on: portolan-spec, rashid -->
 
-# Catalog Grader
+# Catalog grader
 
 This skill grades one Portolan catalog. rashid decides conformance. This skill grades the rest: honesty, documentation, access, visuals, organization, maintenance, and concision. [reference/rubric.md](reference/rubric.md) defines the grades. Read it in full before you start.
 
@@ -84,9 +84,9 @@ Collect the checkable claims in the documents you read and check each one:
 
 Each claim ends in one of four states: supported, contradicted, unsupported, or unverified. Contradicted and unsupported claims are findings with severity `invented` and kind `contradicted` or `unsupported`. Count every claim you checked in `checked.claims_checked`.
 
-Report a hand-written count, size, or "as of" date that agrees today as kind `drift-prone`, severity `minor`. It is not invented.
+Report a hand-written count, size, or "as of" date that agrees today as kind `drift-prone`, severity `minor`. Do not count it as invented.
 
-## Step 5: Grade
+## Step 5: Grade the catalog
 
 Grade each of the eight areas against its anchors in the rubric. Check each A and A+ requirement. Then follow the seven steps in "Compute the grade" in order. Write one line per step in `computation`, with the grade after the step.
 

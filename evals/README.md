@@ -3,7 +3,7 @@
 An eval measures whether a skill does its job, so a change to the skill can show that it helps. Each eval has four parts:
 
 - **Cases.** Real inputs the skill runs on, in `cases.json`.
-- **Frozen inputs.** Anything a case needs that changes over time, such as a published catalog, is captured once and versioned, so two runs of the eval read the same bytes.
+- **Frozen inputs.** The eval captures once anything a case needs that changes over time, such as a published catalog. It versions the copy, so two runs of the eval read the same bytes.
 - **Gold.** What a correct result contains for each case, in `gold.json`. A maintainer confirms each entry.
 - **A runner and a scorer.** The runner starts headless Claude Code with this plugin on each case. The scorer turns each result into metrics.
 
@@ -13,17 +13,17 @@ An eval measures whether a skill does its job, so a change to the skill can show
 | `evals/<skill>/frozen.lock` | The release and checksum of the frozen inputs |
 | `evals/_lib/frozen.sh` | Packs and fetches frozen inputs |
 | `evals/_lib/build-report-lite.mjs` | Builds `report.html` from a run |
-| `.claude/hillclimb/<skill>/` | Run output: one directory per variant (`baseline`, `v1`, ...) |
+| `.claude/hillclimb/<skill>/` | Run output: one directory per variant (`baseline`, `v1`, `v2`) |
 
 The frozen inputs are too large for git. Each version is a tarball on a release of this repository named `evals-<skill>-frozen-v<N>`.
 
 ## Publish frozen inputs
 
-A maintainer with write access publishes each version of an eval's frozen inputs. v1 of the catalog-grader inputs was published this way on 2026-10-15.
+A maintainer with write access publishes each version of an eval's frozen inputs. nlebovits published v1 of the catalog-grader inputs this way on 2026-10-15.
 
 1. Read `cases/NOTICE.md`, which `frozen.sh pack` writes into the tarball. It lists the source, license, and licensor of each case. The copies keep their publishers' licenses, not this repository's Apache-2.0. Remove a case whose license does not allow redistribution, and record the decision in the pull request.
 2. Commit `frozen.lock` and push. The release tag must point at a pushed commit that holds this `frozen.lock`.
-3. Create the release as a pre-release, with `NOTICE.md` as its notes. GitHub needs the full commit SHA.
+3. Create the release as a pre-release, with `NOTICE.md` as its notes. GitHub needs the full commit hash.
 
    ```bash
    gh release create evals-catalog-grader-frozen-v1 \
@@ -56,4 +56,4 @@ The pull request that changes a skill should not also change its gold. Change go
 
 - [catalog-grader](catalog-grader/README.md)
 
-To add an eval for another skill, run `/claude-api build-eval` in Claude Code, and follow the layout above.
+To add an eval for another skill, run `/claude-api build-eval` in Claude Code, and follow the layout in this file.

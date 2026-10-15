@@ -2,7 +2,7 @@
 
 This eval runs the [catalog-grader](../../skills/catalog-grader/SKILL.md) skill on published catalogs and scores each report. It checks the grade and the findings, the parts of a report that the registry acts on, and the evidence for each finding.
 
-Each case is one catalog. Its facts were collected once by `collect_facts.py` and frozen, so the skill starts at Step 2 and every run reads the same input.
+Each case is one catalog. `collect_facts.py` collected its facts once, and the eval froze them. The skill starts at Step 2, and two runs read the same input.
 
 ## Metrics
 
@@ -11,7 +11,7 @@ A report passes when all five hard checks hold.
 | Metric | Kind | Passes when |
 |---|---|---|
 | `schema_ok` | hard | `report.json` validates against `report.schema.json` |
-| `rules_ok` | hard | The grade follows from the report's area grades, caps, ceiling, and A requirements, and the report is marked incomplete when the facts require it |
+| `rules_ok` | hard | The grade follows from the report's area grades, caps, ceiling, and A requirements, and the report marks itself incomplete when the facts require it |
 | `quotes_ok` | hard | Every finding's quote appears verbatim in the saved documents or `facts.json` |
 | `coverage_ok` | hard | The report read every collection, or at least 12 (Step 3) |
 | `in_band` | hard | The grade is in the gold band |
@@ -75,4 +75,4 @@ The cases and the gold change together with the frozen inputs.
 5. Commit `cases.json`, `gold.json`, and `frozen.lock` in one pull request, and push.
 6. Publish the release. [Publish frozen inputs](../README.md#publish-frozen-inputs) gives the steps.
 
-A catalog changes after it is frozen, so its gold describes the frozen version. To catch up with a catalog, freeze it again, check its gold, and publish a new version.
+A catalog changes after the eval freezes it, so its gold describes the frozen version. To catch up with a catalog, freeze it again, check its gold, and publish a new version.

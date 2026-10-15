@@ -13,7 +13,7 @@ Some skills have an eval in [`evals/`](evals/README.md) that measures whether a 
 
 ### `catalog-grader`
 
-Grade a published Portolan catalog from A+ to F on what the validator cannot check. Collect the checkable facts with a script, read every document and thumbnail, find invented or drift-prone claims, and write a JSON report in which every finding quotes its evidence. Use when someone asks to grade, rate, score, audit, or review the quality of a Portolan catalog, or when a registry submission needs a quality review.
+Grade a published Portolan catalog from A+ to F on honesty, documentation, access, visuals, organization, maintenance, and concision. Collect the checkable facts with a script, read every document and thumbnail, find invented or drift-prone claims, and write a JSON report in which every finding quotes its evidence. Use when someone asks to grade, rate, score, audit, or review the quality of a Portolan catalog, or when a registry submission needs a quality review.
 
 ### `customize-portolan-browser`
 
