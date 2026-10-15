@@ -1,0 +1,38 @@
+{
+  "tag": "evals-catalog-grader-frozen-v1",
+  "asset": "catalog-grader-frozen-v1.tar.gz",
+  "url": "https://github.com/portolan-sdi/portolan-skills/releases/download/evals-catalog-grader-frozen-v1/catalog-grader-frozen-v1.tar.gz",
+  "sha256": "42566a1edc13cc653d2829a2b9d7f42b9635cd1a01cf9b9b3082f82ae617d62a",
+  "cases": {
+    "catalog": {
+      "frozen_at": "2026-10-15T13:51:45Z",
+      "collect_facts_sha": "056a0ad2d241",
+      "repo_sha": null
+    },
+    "phl-housing-demo": {
+      "frozen_at": "2026-10-15T13:49:22Z",
+      "collect_facts_sha": "056a0ad2d241",
+      "repo_sha": "60c6ad7feeeb2f20d83c210b1f8179a523e89895"
+    },
+    "planet-disasterdata": {
+      "frozen_at": "2026-10-15T13:57:38Z",
+      "collect_facts_sha": "056a0ad2d241",
+      "repo_sha": null
+    },
+    "portolan-nl": {
+      "frozen_at": "2026-10-15T15:40:37Z",
+      "collect_facts_sha": "10d1efdce89c",
+      "repo_sha": "bbc02c90def4d2b22520d659f36e811960c73691"
+    },
+    "trimet": {
+      "frozen_at": "2026-10-15T15:44:56Z",
+      "collect_facts_sha": "10d1efdce89c",
+      "repo_sha": "65aa053429369676b937e7cfac8b602a5a0707f9"
+    },
+    "wb-fwi": {
+      "frozen_at": "2026-10-15T13:30:41Z",
+      "collect_facts_sha": "056a0ad2d241",
+      "repo_sha": "f7e9cf0ae6cabaca45b8b12249219c35a95c90d5"
+    }
+  }
+}

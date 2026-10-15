@@ -1,0 +1,229 @@
+[
+  {
+    "id": "global-data",
+    "url": "https://data.source.coop/ftw/global-data/catalog.json",
+    "repo": "https://github.com/fieldsoftheworld/ftw-data-catalog",
+    "tags": [
+      "holmes",
+      "registry"
+    ]
+  },
+  {
+    "id": "planet-disasterdata",
+    "url": "https://data.source.coop/planet/disasterdata/catalog.json",
+    "repo": null,
+    "tags": [
+      "holmes",
+      "registry"
+    ]
+  },
+  {
+    "id": "portolan-nl",
+    "url": "https://data.source.coop/cholmes/portolan-nl/catalog.json",
+    "repo": "https://github.com/cholmes/portolan-nl-catalog",
+    "tags": [
+      "holmes",
+      "registry"
+    ]
+  },
+  {
+    "id": "st-louis-open-data-mirror",
+    "url": "https://data.source.coop/tge-labs/st-louis-open-data-mirror/catalog.json",
+    "repo": null,
+    "tags": [
+      "holmes",
+      "registry"
+    ]
+  },
+  {
+    "id": "trimet",
+    "url": "https://data.source.coop/cholmes/trimet/catalog.json",
+    "repo": "https://github.com/cholmes/portolan-catalog-trimet",
+    "tags": [
+      "holmes",
+      "registry"
+    ]
+  },
+  {
+    "id": "sverige-lantmateriet",
+    "url": "https://storage.googleapis.com/carto-open-catalogs/sverige-lantmateriet/main/catalog.json",
+    "repo": null,
+    "tags": [
+      "carto",
+      "registry"
+    ]
+  },
+  {
+    "id": "danmark-dataforsyningen",
+    "url": "https://storage.googleapis.com/carto-open-catalogs/danmark-dataforsyningen/main/catalog.json",
+    "repo": null,
+    "tags": [
+      "carto",
+      "registry"
+    ]
+  },
+  {
+    "id": "wales-datamapwales",
+    "url": "https://storage.googleapis.com/carto-open-catalogs/wales-datamapwales/main/catalog.json",
+    "repo": null,
+    "tags": [
+      "carto",
+      "registry"
+    ]
+  },
+  {
+    "id": "corine-land-cover-2018",
+    "url": "https://parquetry.geomermaids.com/clc/catalog/catalog.json",
+    "repo": "https://github.com/gsueur/osm-geoparquet",
+    "tags": [
+      "geomermaids",
+      "registry"
+    ]
+  },
+  {
+    "id": "us-census-tiger",
+    "url": "https://parquetry.geomermaids.com/census/catalog/catalog.json",
+    "repo": "https://github.com/gsueur/osm-geoparquet",
+    "tags": [
+      "geomermaids",
+      "registry"
+    ]
+  },
+  {
+    "id": "epoch-jrc-tmf",
+    "url": "https://data.source.coop/epoch/jrc-tmf/catalog.json",
+    "repo": null,
+    "tags": [
+      "epoch",
+      "registry"
+    ]
+  },
+  {
+    "id": "epoch-forest-typology-2020",
+    "url": "https://data.source.coop/epoch/forest-typology-2020/catalog.json",
+    "repo": null,
+    "tags": [
+      "epoch",
+      "registry"
+    ]
+  },
+  {
+    "id": "soft-commodity-infrastructure",
+    "url": "https://data.source.coop/tristangruppwri/soft-commodity-infrastructure/catalog.json",
+    "repo": null,
+    "tags": [
+      "wri",
+      "registry"
+    ]
+  },
+  {
+    "id": "moldova-geodata",
+    "url": "https://data.source.coop/nlebovits/moldova-geodata/catalog.json",
+    "repo": "https://github.com/nlebovits/moldova-geodata",
+    "tags": [
+      "lebovits",
+      "registry"
+    ]
+  },
+  {
+    "id": "phl-housing-demo",
+    "url": "https://data.source.coop/nlebovits/phl-housing-demo/catalog.json",
+    "repo": "https://github.com/nlebovits/phl-housing-demo",
+    "tags": [
+      "lebovits",
+      "registry"
+    ]
+  },
+  {
+    "id": "pergamino-ide",
+    "url": "https://data.source.coop/nlebovits/pergamino-ide/catalog.json",
+    "repo": "https://github.com/nlebovits/pergamino-ide-catalog",
+    "tags": [
+      "lebovits",
+      "registry"
+    ]
+  },
+  {
+    "id": "overture-portolan",
+    "url": "https://nlebovits.github.io/overture-portolan/catalog.json",
+    "repo": "https://github.com/nlebovits/overture-portolan",
+    "tags": [
+      "lebovits",
+      "registry"
+    ]
+  },
+  {
+    "id": "wb-fwi",
+    "url": "https://data.source.coop/portolan-mirrors/wb-fwi/catalog.json",
+    "repo": "https://github.com/nlebovits/wb-fwi",
+    "tags": [
+      "lebovits",
+      "registry"
+    ]
+  },
+  {
+    "id": "catalog",
+    "url": "https://utrecht.blob.core.windows.net/catalog/catalog.json",
+    "repo": null,
+    "tags": [
+      "single",
+      "registry",
+      "known-bad"
+    ]
+  },
+  {
+    "id": "ftw-global-data-2e",
+    "url": "https://data.source.coop/ftw/global-data-2e/catalog.json",
+    "repo": "https://github.com/fieldsoftheworld/ftw-global-data-catalog",
+    "tags": [
+      "single",
+      "registry"
+    ]
+  },
+  {
+    "id": "harmonized-field-data",
+    "url": "https://data.source.coop/ftw/harmonized-field-data/catalog.json",
+    "repo": "https://github.com/fieldsoftheworld/harmonized-field-data-catalog",
+    "tags": [
+      "single",
+      "registry"
+    ]
+  },
+  {
+    "id": "karstgrundwasser-v2",
+    "url": "https://ron-portolan.s3.eu-central-1.amazonaws.com/portolan/catalog.json",
+    "repo": null,
+    "tags": [
+      "single",
+      "registry"
+    ]
+  },
+  {
+    "id": "staging",
+    "url": "https://portolan-hydroatlas-mirror.s3.us-east-2.amazonaws.com/catalog.json",
+    "repo": null,
+    "tags": [
+      "single",
+      "registry"
+    ]
+  },
+  {
+    "id": "summerland-open-data",
+    "url": "https://data.source.coop/jbants/summerland-open-data/catalog.json",
+    "repo": null,
+    "tags": [
+      "single",
+      "registry"
+    ]
+  },
+  {
+    "id": "portolan-spec-examples",
+    "url": "https://github.com/portolan-sdi/portolan-spec/tree/main/stac/examples",
+    "local": "stac/examples/catalog.json",
+    "repo": "https://github.com/portolan-sdi/portolan-spec",
+    "tags": [
+      "reference",
+      "local"
+    ]
+  }
+]

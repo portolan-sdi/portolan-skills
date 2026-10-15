@@ -7,10 +7,24 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `git-backed-catalog` tells the agent to add a check that runs every query and
-  claim check in the catalog docs against the published data. The check runs on
-  each pull request, on a schedule, and after each upload. A failed scheduled
-  run opens one tracking issue (#33).
+- `git-backed-catalog` adds CI checks for documented queries and claims (#33).
+- [`catalog-grader`](skills/catalog-grader/SKILL.md) grades catalog quality
+  with evidence. Its [rubric](skills/catalog-grader/reference/rubric.md)
+  replaces the specification's grader page.
+- The [catalog-grader evaluation](evals/catalog-grader/README.md) tests the
+  skill against saved catalog data. Pull requests test the scorer, and
+  maintainers can start a full evaluation from a workflow.
+
+### Fixed
+
+- The fact collector now reads registry links correctly, resolves relative
+  SQL paths, reuses earlier SQL setup, installs Python dependencies, and
+  gives rashid a separate timeout.
+
+### Changed
+
+- `portolan-bootstrap` grades the catalog with `catalog-grader` instead of
+  the specification's grader page.
 
 ## 0.5.0 - 2026-10-06
 

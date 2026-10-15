@@ -1,0 +1,409 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "catalog-grader-report/1",
+  "title": "Catalog grader report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "catalog",
+    "repo",
+    "grade",
+    "complete",
+    "incomplete_reasons",
+    "ceiling",
+    "invented_claims",
+    "areas",
+    "a_requirements",
+    "a_plus",
+    "computation",
+    "findings",
+    "checked"
+  ],
+  "properties": {
+    "schema": {
+      "const": "catalog-grader-report/1"
+    },
+    "catalog": {
+      "type": "string",
+      "description": "The root catalog.json URL or directory you graded."
+    },
+    "repo": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The source repository path, or null if you do not have it."
+    },
+    "grade": {
+      "enum": [
+        "A+",
+        "A",
+        "B",
+        "C",
+        "D",
+        "F"
+      ]
+    },
+    "complete": {
+      "type": "boolean",
+      "description": "If required facts are unavailable, set this to false."
+    },
+    "incomplete_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grade",
+        "reason"
+      ],
+      "properties": {
+        "grade": {
+          "enum": [
+            "none",
+            "C",
+            "D",
+            "F"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "invented_claims": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Number of findings with severity invented."
+    },
+    "areas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "machine-contract",
+        "honesty",
+        "documentation",
+        "access",
+        "visuals",
+        "organization",
+        "maintenance",
+        "concision"
+      ],
+      "properties": {
+        "machine-contract": {
+          "$ref": "#/$defs/area"
+        },
+        "honesty": {
+          "$ref": "#/$defs/area"
+        },
+        "documentation": {
+          "$ref": "#/$defs/area"
+        },
+        "access": {
+          "$ref": "#/$defs/area"
+        },
+        "visuals": {
+          "$ref": "#/$defs/area"
+        },
+        "organization": {
+          "$ref": "#/$defs/area"
+        },
+        "maintenance": {
+          "$ref": "#/$defs/area"
+        },
+        "concision": {
+          "$ref": "#/$defs/area"
+        }
+      }
+    },
+    "a_requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "met",
+        "requirements"
+      ],
+      "properties": {
+        "met": {
+          "type": "boolean",
+          "description": "True when each A requirement is met."
+        },
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "git",
+            "ci",
+            "logo",
+            "registry"
+          ],
+          "properties": {
+            "git": {
+              "$ref": "#/$defs/requirement"
+            },
+            "ci": {
+              "$ref": "#/$defs/requirement"
+            },
+            "logo": {
+              "$ref": "#/$defs/requirement"
+            },
+            "registry": {
+              "$ref": "#/$defs/requirement"
+            }
+          }
+        }
+      }
+    },
+    "a_plus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "awarded",
+        "requirements"
+      ],
+      "properties": {
+        "awarded": {
+          "type": "boolean"
+        },
+        "requirements": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "rashid-clean",
+            "candid",
+            "narrative",
+            "experience"
+          ],
+          "properties": {
+            "rashid-clean": {
+              "$ref": "#/$defs/requirement"
+            },
+            "candid": {
+              "$ref": "#/$defs/requirement"
+            },
+            "narrative": {
+              "$ref": "#/$defs/requirement"
+            },
+            "experience": {
+              "$ref": "#/$defs/requirement"
+            }
+          }
+        }
+      }
+    },
+    "computation": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Record the grade after each rubric step, in order."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "checked": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "collections_read",
+        "claims_checked",
+        "unverified"
+      ],
+      "properties": {
+        "collections_read": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The paths of nodes whose documents you read in full."
+        },
+        "claims_checked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unverified": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "quote",
+              "where",
+              "reason"
+            ],
+            "properties": {
+              "quote": {
+                "type": "string"
+              },
+              "where": {
+                "$ref": "#/$defs/where"
+              },
+              "reason": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "area": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "grade",
+        "summary"
+      ],
+      "properties": {
+        "grade": {
+          "enum": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 300
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "met",
+        "evidence"
+      ],
+      "properties": {
+        "met": {
+          "type": [
+            "boolean",
+            "null"
+          ],
+          "description": "null means unknown, which counts as not met."
+        },
+        "evidence": {
+          "type": "string"
+        }
+      }
+    },
+    "where": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "node",
+        "file",
+        "line"
+      ],
+      "properties": {
+        "node": {
+          "type": "string",
+          "description": "The node path in facts.json, with \".\" for the root."
+        },
+        "file": {
+          "type": "string",
+          "description": "URL or path relative to the facts directory."
+        },
+        "line": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "area",
+        "severity",
+        "kind",
+        "where",
+        "quote",
+        "fact",
+        "evidence",
+        "fix"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^F[0-9]+$"
+        },
+        "area": {
+          "enum": [
+            "machine-contract",
+            "honesty",
+            "documentation",
+            "access",
+            "visuals",
+            "organization",
+            "maintenance",
+            "concision"
+          ]
+        },
+        "severity": {
+          "enum": [
+            "invented",
+            "major",
+            "minor"
+          ],
+          "description": "Invented findings count toward the honesty grade limit. Major findings lower an area toward D, and minor findings lower it toward B."
+        },
+        "kind": {
+          "enum": [
+            "contradicted",
+            "unsupported",
+            "drift-prone",
+            "broken",
+            "missing",
+            "stub",
+            "weak",
+            "verbose",
+            "duplicated",
+            "blank",
+            "mislabeled",
+            "other"
+          ]
+        },
+        "where": {
+          "$ref": "#/$defs/where"
+        },
+        "quote": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Copy the text at where.file exactly. If the finding concerns missing content, use null."
+        },
+        "fact": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Supporting JSON pointer into facts.json, such as /nodes/3/legend_checks/0."
+        },
+        "evidence": {
+          "type": "string",
+          "description": "Describe what you checked and found."
+        },
+        "fix": {
+          "type": "string",
+          "description": "Describe the fix in one sentence."
+        }
+      }
+    }
+  }
+}

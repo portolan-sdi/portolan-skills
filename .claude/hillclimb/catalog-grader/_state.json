@@ -1,0 +1,72 @@
+{
+  "reps": 2,
+  "harness_paths": [
+    "evals/catalog-grader/grade.mjs",
+    "evals/catalog-grader/cases.json",
+    "evals/catalog-grader/gold.json"
+  ],
+  "metrics": [
+    {
+      "id": "pass",
+      "kind": "binary",
+      "label": "Pass"
+    },
+    {
+      "id": "in_band",
+      "kind": "binary",
+      "label": "Grade in band"
+    },
+    {
+      "id": "key_recall",
+      "kind": "judge",
+      "label": "Key recall"
+    },
+    {
+      "id": "false_invent",
+      "kind": "float",
+      "label": "False invent",
+      "better": "lower"
+    },
+    {
+      "id": "quotes_ok",
+      "kind": "float",
+      "label": "Quotes exact"
+    },
+    {
+      "id": "rules_ok",
+      "kind": "binary",
+      "label": "Rules applied"
+    },
+    {
+      "id": "coverage_ok",
+      "kind": "binary",
+      "label": "Coverage"
+    },
+    {
+      "id": "schema_ok",
+      "kind": "binary",
+      "label": "Schema valid"
+    }
+  ],
+  "perf_fields": [
+    {
+      "id": "cc_cost_usd",
+      "label": "CC cost",
+      "unit": "$"
+    },
+    {
+      "id": "latency_s",
+      "label": "Latency",
+      "unit": "s"
+    },
+    {
+      "id": "num_turns",
+      "label": "Turns"
+    },
+    {
+      "id": "tool_calls",
+      "label": "Tool calls"
+    }
+  ],
+  "harness_sha": "318099c0eaa429a20c8ecd075bb712ff64f5e1646478db73a1c0d671317c306d"
+}

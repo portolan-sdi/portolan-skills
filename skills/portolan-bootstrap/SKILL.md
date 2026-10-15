@@ -199,7 +199,7 @@ Such a collection SHOULD also publish `items.parquet` in the collection root (PO
 
 ## The Documentation Contract
 
-The standards live in [documentation.md](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/documentation.md) and the scoring in [grader.md](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/grader.md). Read both. This section covers only what agents reliably get wrong.
+Read the [documentation standards](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/documentation.md). Use `catalog-grader` to assess the result.
 
 Each catalog and collection includes an `AGENTS.md` linked with `rel: agents` and a `README.md` linked with `rel: describedby` (PORTO-CORE-005, PORTO-CORE-061, PORTO-CORE-062). The CLI writes both links.
 
@@ -246,7 +246,7 @@ Every query in `AGENTS.md` must have been run against the published data. A reci
 
 ### Catalog navigation
 
-Apply the [navigation contract](reference/catalog-navigation.md) to every catalog, subcatalog, collection, and README listing. Keep the link generation in the catalog project so each rebuild preserves it.
+Apply the [navigation contract](reference/catalog-navigation.md). Keep link generation in the catalog project so rebuilds preserve it.
 
 ### Link Hygiene
 
@@ -353,13 +353,13 @@ portolan check
 portolan check --live --url "<PUBLISHED_URL>"
 ```
 
-Score the result against [grader.md](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/grader.md) and report the tier per section at the final checkpoint.
+Run `catalog-grader` on the local catalog before pushing and the published URL afterward. Report the overall and area grades at the final checkpoint.
 
 Verify the catalog as a consumer would, using the `reading-portolan` skill. Run the queries you wrote into `AGENTS.md`, and fix the documentation when one of them does not run.
 
 ### Checkpoint: Publish
 
-Present the file count, total size, destination, the grader tiers, and every warning accumulated during the run. Ask before pushing.
+Present the file count, total size, destination, overall and area grades, and accumulated warnings. Ask before pushing.
 
 ## Mechanics
 
@@ -406,7 +406,7 @@ Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperativ
 | Destination | Options available | Where should this publish? |
 | License and contact | What the source states, and where it says it | Confirm license, host name, and url or email |
 | Style plan | Styles per collection, columns, distributions, legend viability | Approve before tiling? |
-| Quality control | Per-collection checklist results and grader tiers | Fix now, or publish? |
+| Quality control | Per-collection checklist results, overall and area grades | Fix now, or publish? |
 | Publish | File count, size, destination, accumulated warnings | Push? |
 
 | Situation | Action |

@@ -47,7 +47,7 @@ jobs:
           uv venv .venv
           uv pip install --python .venv/bin/python \
             "rashid==$RASHID" \
-            pytest httpx pyyaml click
+            pytest httpx pyyaml click duckdb pillow
           echo "rashid=$RASHID; the checker installs the pinned CLI separately"
 
       - name: Test the checker
