@@ -23,7 +23,7 @@ def extract_frontmatter(skill_path: Path) -> dict | None:
 
 def generate_skills_section(skills_dir: Path) -> str:
     """Generate the ## Skills section from all SKILL.md files."""
-    lines = ["## Skills", ""]
+    lines = ["## Skills", "", "| Skill | What it does |", "|---|---|"]
 
     skill_dirs = sorted(skills_dir.iterdir())
     for skill_dir in skill_dirs:
@@ -35,11 +35,14 @@ def generate_skills_section(skills_dir: Path) -> str:
         if not fm or "name" not in fm:
             continue
 
-        lines.append(f"### `{fm['name']}`")
-        lines.append("")
-        if "description" in fm:
-            lines.append(fm["description"])
-            lines.append("")
+        # The first sentence summarizes the skill; the linked file has its
+        # full description, requirements, and workflow.
+        summary = fm.get("description", "").split(". ", 1)[0]
+        if summary and not summary.endswith("."):
+            summary += "."
+        summary = summary.replace("|", "\\|")
+        link = skill_file.relative_to(skills_dir.parent).as_posix()
+        lines.append(f"| [`{fm['name']}`]({link}) | {summary} |")
 
     return "\n".join(lines)
 
