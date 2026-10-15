@@ -17,6 +17,30 @@ An eval measures whether a skill does its job, so a change to the skill can show
 
 The frozen inputs are too large for git. Each version is a tarball on a release of this repository named `evals-<skill>-frozen-v<N>`.
 
+## Publish frozen inputs
+
+A maintainer with write access publishes each version of an eval's frozen inputs. v1 of the catalog-grader inputs was published this way on 2026-10-15.
+
+1. Read `cases/NOTICE.md`, which `frozen.sh pack` writes into the tarball. It lists the source, license, and licensor of each case. The copies keep their publishers' licenses, not this repository's Apache-2.0. Remove a case whose license does not allow redistribution, and record the decision in the pull request.
+2. Commit `frozen.lock` and push. The release tag must point at a pushed commit that holds this `frozen.lock`.
+3. Create the release as a pre-release, with `NOTICE.md` as its notes. GitHub needs the full commit SHA.
+
+   ```bash
+   gh release create evals-catalog-grader-frozen-v1 \
+     evals/catalog-grader/dist/catalog-grader-frozen-v1.tar.gz \
+     --prerelease --target "$(git rev-parse HEAD)" \
+     --title "catalog-grader eval: frozen inputs v1" \
+     --notes-file evals/catalog-grader/cases/NOTICE.md
+   ```
+
+4. Check the release from a clean directory. `fetch` verifies the sha256 in `frozen.lock`.
+
+   ```bash
+   evals/_lib/frozen.sh fetch evals/catalog-grader
+   ```
+
+Never replace the asset of a published version. Publish the next version instead, so an old `frozen.lock` keeps fetching the bytes it names.
+
 ## Improve a skill with its eval
 
 1. Fetch the frozen inputs and run the baseline. The eval's README gives the commands.

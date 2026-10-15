@@ -65,9 +65,11 @@ print(json.dumps({"tag": tag, "asset": asset, "url": f"{repo}/releases/download/
 PY
   rm "$eval_dir/dist/files.txt"
   echo "wrote $eval_dir/dist/$asset ($(du -h "$eval_dir/dist/$asset" | cut -f1)) and $lock"
-  echo "publish it with:"
+  echo "Read $eval_dir/cases/NOTICE.md, commit frozen.lock, and push. Then publish with:"
   echo "  gh release create $tag $eval_dir/dist/$asset --prerelease \\"
-  echo "    --title \"$skill eval: frozen inputs v$version\" --notes-file $eval_dir/cases/NOTICE.md"
+  echo "    --target \"\$(git rev-parse HEAD)\" --title \"$skill eval: frozen inputs v$version\" \\"
+  echo "    --notes-file $eval_dir/cases/NOTICE.md"
+  echo "See evals/README.md, section Publish frozen inputs."
   ;;
 fetch)
   [ -f "$lock" ] || { echo "no $lock; freeze the cases first" >&2; exit 1; }

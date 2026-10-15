@@ -66,12 +66,13 @@ The cases and the gold change together with the frozen inputs.
    ```
 
 3. Read `cases/<case-id>/frozen/facts.json` and the saved documents. Write the gold entry: a grade band, and the problems a correct report must state. Put who confirmed it in `source`.
-4. Pack the next version, and publish the release that the command prints.
+4. Pack the next version. The command writes `frozen.lock` and the tarball.
 
    ```bash
    evals/_lib/frozen.sh pack evals/catalog-grader <N>
    ```
 
-5. Commit `cases.json`, `gold.json`, and `frozen.lock` in one pull request.
+5. Commit `cases.json`, `gold.json`, and `frozen.lock` in one pull request, and push.
+6. Publish the release. [Publish frozen inputs](../README.md#publish-frozen-inputs) gives the steps.
 
 A catalog changes after it is frozen, so its gold describes the frozen version. To catch up with a catalog, freeze it again, check its gold, and publish a new version.
