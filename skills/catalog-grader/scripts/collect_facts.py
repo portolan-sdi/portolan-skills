@@ -16,11 +16,10 @@ is built from. The script writes DIR/facts.json plus copies of every
 README.md, AGENTS.md, thumbnail, and icon under DIR, so the grader reads the
 same bytes the facts describe.
 
-The SQL in a catalog's documentation is untrusted input. Each query runs in
-its own process, in DuckDB with file access limited to https URLs (and the
-local catalog directory when CATALOG is local). External access is then
-set so that no statement can widen it. Python and shell blocks are
-recorded and never run.
+The script runs the SQL and Python blocks in the documentation, plus the
+shell blocks with --run-shell, each in its own process and its own scratch
+directory under DIR/work. That code comes from the catalog, so run the
+script on a machine you can throw away, such as a CI runner.
 """
 
 from __future__ import annotations
@@ -55,7 +54,6 @@ READ_FN_RE = re.compile(
     r"\b(read_parquet|parquet_scan|read_csv|read_csv_auto|read_json|read_json_auto|st_read|parquet_metadata|parquet_file_metadata)\s*\(\s*'([^']+)'",
     re.IGNORECASE,
 )
-INSTALL_RE = re.compile(r"^\s*(?:FORCE\s+)?(INSTALL|LOAD)\s+([A-Za-z0-9_]+)", re.IGNORECASE)
 SQL_LANGS = {"sql", "duckdb"}
 # A claim check is a query in an HTML comment that returns the rows that
 # break the claim (see the git-backed-catalog skill). No rows means true.
@@ -389,34 +387,23 @@ def style_facts(style: dict) -> dict:
 # --------------------------------------------------------------------- SQL
 
 QUERY_RUNNER = r"""
-import json, re, sys, time, duckdb
+import json, sys, time, duckdb
 job = json.loads(sys.stdin.read())
 out = {"ok": False}
 t0 = time.time()
+
+def show(v):
+    if isinstance(v, (bytes, bytearray)):
+        return f"<binary {len(v)} bytes>"
+    s = str(v)
+    return s if len(s) <= 200 else s[:200] + "..."
+
 try:
     con = duckdb.connect()
-    for ext in job["extensions"]:
-        try:
-            con.execute(f"INSTALL {ext}"); con.execute(f"LOAD {ext}")
-        except Exception as exc:
-            out.setdefault("extension_errors", []).append(f"{ext}: {str(exc)[:300]}")
-    q = lambda v: "'" + v.replace("'", "''") + "'"
     if job["search_path"]:
-        con.execute("SET file_search_path = " + q(job["search_path"]))
-    con.execute("SET allowed_directories = [" + ", ".join(q(a) for a in job["allowed"]) + "]")
-    # Once external access is off, no statement can turn it back on or widen
-    # allowed_directories. The settings below write files, so refuse them.
-    con.execute("SET enable_external_access = false")
-    deny = re.compile(r"\b(profiling_output|log_query_path|extension_directory|secret_directory|custom_extension_repository)\b", re.I)
-    def show(v):
-        if isinstance(v, (bytes, bytearray)):
-            return f"<binary {len(v)} bytes>"
-        s = str(v)
-        return s if len(s) <= 200 else s[:200] + "..."
+        con.execute("SET file_search_path = '" + job["search_path"].replace("'", "''") + "'")
     res = None
     for stmt in con.extract_statements(job["sql"]):
-        if deny.search(stmt.query):
-            raise PermissionError("refused a statement that writes files: " + stmt.query[:80])
         res = con.execute(stmt.query)
     if res is not None and res.description:
         out["columns"] = [d[0] for d in res.description]
@@ -425,66 +412,165 @@ try:
 except Exception as exc:
     out["error"] = f"{type(exc).__name__}: {exc}"[:600]
 out["seconds"] = round(time.time() - t0, 2)
-# A failure that follows a failed extension install is the grader's
-# environment, not the catalog. The grader must not count it against the docs.
-out["environment_error"] = bool(not out["ok"] and out.get("extension_errors"))
 print(json.dumps(out))
 """
 
+# A failure to fetch an extension or a package is the grader's environment,
+# not the catalog. The grader must not count it against the docs.
+ENV_ERROR_RE = re.compile(
+    r"Failed to (download|install)[^\n]*extension|extension[^\n]*could not be (downloaded|installed)"
+    r"|No solution found when resolving|Failed to (fetch|download)[^\n]*(pypi|files\.pythonhosted)"
+    r"|uv: command not found",
+    re.IGNORECASE,
+)
+# A relative path that does not resolve: a docs defect of its own kind.
+MISSING_FILE_RE = re.compile(r"FileNotFoundError|No such file or directory|No files found that match the pattern", re.IGNORECASE)
 
-def prepare_sql(code: str, doc_ref: str) -> tuple[str, list[str], list[str]]:
-    """Drop INSTALL and LOAD lines, which run before the lock, and resolve
-    relative paths in read functions against the document's location."""
-    extensions = {"httpfs", "spatial"} if is_url(doc_ref) else {"spatial"}
-    kept: list[str] = []
-    for stmt in re.split(r"(?<=;)", code):
-        m = INSTALL_RE.match(stmt.strip())
-        if m:
-            extensions.add(m.group(2).lower())
-            continue
-        kept.append(stmt)
-    sql = "".join(kept)
+# Import names whose PyPI package has another name.
+IMPORT_PACKAGES = {
+    "odc": "odc-stac", "pystac_client": "pystac-client", "rioxarray": "rioxarray", "sklearn": "scikit-learn",
+    "PIL": "pillow", "yaml": "pyyaml", "osgeo": "gdal", "cv2": "opencv-python-headless", "stac_geoparquet": "stac-geoparquet",
+    "geoarrow": "geoarrow-pyarrow", "lonboard": "lonboard", "planetary_computer": "planetary-computer", "dateutil": "python-dateutil",
+}
+
+
+def work_dir(doc_ref: str, local_root: str | None) -> str:
+    """A fresh directory to run one block in.
+
+    For a local catalog it links the files beside the document, so a
+    relative path reads what a reader of the published copy would read,
+    while anything the block writes stays out of the catalog.
+    """
+    import tempfile
+
+    base = OUT_DIR / "work"
+    base.mkdir(parents=True, exist_ok=True)
+    path = tempfile.mkdtemp(dir=base)
+    if local_root:
+        src = os.path.dirname(doc_ref)
+        for name in os.listdir(src):
+            try:
+                os.symlink(os.path.join(src, name), os.path.join(path, name))
+            except OSError:
+                pass
+    return path
+
+
+def classify(out: dict, text: str) -> dict:
+    out["environment_error"] = bool(not out.get("ok") and ENV_ERROR_RE.search(text or ""))
+    out["missing_file"] = bool(not out.get("ok") and not out["environment_error"] and MISSING_FILE_RE.search(text or ""))
+    return out
+
+
+def prepare_sql(code: str, doc_ref: str) -> tuple[str, list[str]]:
+    """Resolve relative paths in read functions against a published document's URL.
+
+    A reader who pastes the query runs it from their own directory, so a
+    relative path in published docs is a defect. The grader still learns
+    whether the query works, and the report says the path was resolved.
+    """
     rewritten: list[str] = []
+    if not is_url(doc_ref):
+        return code, rewritten
 
     def fix(m: re.Match) -> str:
-        fn, path = m.group(1), m.group(2)
-        if is_url(path) or path.startswith(("s3://", "gs://", "/")) or not is_url(doc_ref):
+        path = m.group(2)
+        if is_url(path) or path.startswith(("s3://", "gs://", "/")):
             return m.group(0)
         absolute = urllib.parse.urljoin(doc_ref, path)
         rewritten.append(f"{path} -> {absolute}")
         return m.group(0).replace(f"'{path}'", f"'{absolute}'")
 
-    sql = READ_FN_RE.sub(fix, sql)
-    return sql, sorted(extensions), rewritten
+    return READ_FN_RE.sub(fix, code), rewritten
 
 
 def run_sql(code: str, doc_ref: str, local_root: str | None, timeout: int, max_rows: int = 5) -> dict:
-    sql, extensions, rewritten = prepare_sql(code, doc_ref)
-    if is_url(doc_ref) and "httpfs" not in extensions:
-        extensions.append("httpfs")
-    allowed = ["https://", "http://"]
-    search_path = ""
-    if local_root:
-        allowed.append(local_root.rstrip("/") + "/")
-        search_path = os.path.dirname(doc_ref)
-    job = {"sql": sql, "extensions": extensions, "allowed": allowed, "search_path": search_path, "max_rows": max_rows}
+    sql, rewritten = prepare_sql(code, doc_ref)
+    cwd = work_dir(doc_ref, local_root)
+    job = {"sql": sql, "search_path": cwd if local_root else "", "max_rows": max_rows}
     try:
         proc = subprocess.run(
             [sys.executable, "-I", "-c", QUERY_RUNNER],
-            input=json.dumps(job),
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            cwd=os.path.dirname(doc_ref) if local_root else str(OUT_DIR),
+            input=json.dumps(job), capture_output=True, text=True, timeout=timeout, cwd=cwd,
         )
-        out = json.loads(proc.stdout.strip().splitlines()[-1]) if proc.stdout.strip() else {"ok": False, "error": proc.stderr.strip()[-600:]}
+        lines = proc.stdout.strip().splitlines()
+        out = json.loads(lines[-1]) if lines else {"ok": False, "error": proc.stderr.strip()[-600:]}
     except subprocess.TimeoutExpired:
         out = {"ok": False, "error": f"timed out after {timeout}s"}
     except ValueError:
         out = {"ok": False, "error": "query runner returned no result"}
     if rewritten:
         out["relative_paths_resolved"] = rewritten
+    return classify(out, out.get("error", ""))
+
+
+def python_packages(code: str) -> list[str]:
+    """The PyPI packages a block imports, leaving out the standard library."""
+    import ast
+
+    names: set[str] = set()
+    try:
+        for node in ast.walk(ast.parse(code)):
+            if isinstance(node, ast.Import):
+                names.update(a.name.split(".")[0] for a in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+                names.add(node.module.split(".")[0])
+    except SyntaxError:
+        names.update(re.findall(r"^\s*(?:from|import)\s+([A-Za-z_]\w*)", code, re.M))
+    std = set(sys.stdlib_module_names)
+    return sorted({IMPORT_PACKAGES.get(n, n.replace("_", "-")) for n in names if n not in std})
+
+
+def strip_magics(code: str) -> tuple[str, list[str]]:
+    """Drop notebook lines (`!pip install`, `%matplotlib`) that plain Python rejects."""
+    kept, dropped = [], []
+    for line in code.splitlines():
+        (dropped if line.lstrip().startswith(("!", "%")) else kept).append(line)
+    return "\n".join(kept), dropped
+
+
+def run_program(argv: list[str], cwd: str, timeout: int, extra_env: dict | None = None) -> dict:
+    env = dict(os.environ, MPLBACKEND="Agg", PYTHONDONTWRITEBYTECODE="1", **(extra_env or {}))
+    t0 = time.time()
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, cwd=cwd, env=env)
+        out = {"ok": proc.returncode == 0, "exit_code": proc.returncode,
+               "stdout": proc.stdout[-1500:], "stderr": proc.stderr[-1500:]}
+    except subprocess.TimeoutExpired:
+        out = {"ok": False, "error": f"timed out after {timeout}s"}
+    except FileNotFoundError as exc:
+        out = {"ok": False, "error": str(exc)}
+    out["seconds"] = round(time.time() - t0, 2)
+    return classify(out, (out.get("stderr") or "") + (out.get("error") or ""))
+
+
+def run_python(code: str, doc_ref: str, local_root: str | None, timeout: int) -> dict:
+    from shutil import which
+
+    code, dropped = strip_magics(code)
+    packages = python_packages(code)
+    cwd = work_dir(doc_ref, local_root)
+    script = os.path.join(cwd, "_block.py")
+    Path(script).write_text(code, encoding="utf-8")
+    if which("uv"):
+        argv = ["uv", "run", "--no-project", "--quiet", "--python", "3.12"]
+        for pkg in packages:
+            argv += ["--with", pkg]
+        argv += ["python", script]
+    else:
+        argv = [sys.executable, script]
+    out = run_program(argv, cwd, timeout)
+    out["packages"] = packages
+    if dropped:
+        out["notebook_lines_dropped"] = dropped
     return out
+
+
+def run_shell(code: str, doc_ref: str, local_root: str | None, timeout: int) -> dict:
+    cwd = work_dir(doc_ref, local_root)
+    script = os.path.join(cwd, "_block.sh")
+    Path(script).write_text(code, encoding="utf-8")
+    return run_program(["bash", "-e", script], cwd, timeout)
 
 
 def query_value(sql: str, local_root: str | None, timeout: int, doc_ref: str) -> dict:
@@ -898,33 +984,62 @@ def default_rashid() -> list[str]:
     return ["rashid"]
 
 
-def run_doc_queries(crawl: Crawl, max_queries: int, timeout: int) -> list[dict]:
-    jobs = []
+PYTHON_LANGS = {"python", "py", "python3", "ipython", "pycon"}
+SHELL_LANGS = {"bash", "sh", "shell", "zsh", "console"}
+
+
+def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> list[dict]:
+    """Run the SQL and Python blocks in the docs, and the shell blocks when asked.
+
+    Docs often split one program across blocks, as a notebook does. A Python
+    block that fails on an undefined name runs again after the earlier
+    Python blocks of the same document.
+    """
+    results: list[dict] = []
     for n in crawl.nodes:
         for kind in ("README.md", "AGENTS.md"):
             doc = n.get(kind)
             if not doc or not doc.get("_blocks"):
                 continue
+            earlier: list[str] = []
             for b in doc["_blocks"]:
-                if b.lang in SQL_LANGS:
-                    jobs.append((n["path"] or ".", kind, b, doc["href"]))
-    results = []
-    for path, kind, b, href in jobs[:max_queries]:
-        res = run_sql(b.code, href, crawl.local_root, timeout)
-        results.append({"node": path, "doc": kind, "line": b.line, "sql": b.code[:2000], "followed_by": b.after[:200], **res})
-    for path, kind, b, href in jobs[max_queries:]:
-        results.append({"node": path, "doc": kind, "line": b.line, "ok": None, "error": f"not run, over the {max_queries}-query limit"})
+                lang = b.lang or "(none)"
+                if lang in SQL_LANGS:
+                    runner = "sql"
+                elif lang in PYTHON_LANGS:
+                    runner = "python"
+                elif lang in SHELL_LANGS and shell:
+                    runner = "shell"
+                else:
+                    continue
+                base = {"node": n["path"] or ".", "doc": kind, "line": b.line, "lang": lang,
+                        "code": b.code[:2000], "followed_by": b.after[:200]}
+                if len(results) >= max_blocks:
+                    results.append({**base, "ok": None, "error": f"not run, over the {max_blocks}-block limit"})
+                    continue
+                if runner == "sql":
+                    res = run_sql(b.code, doc["href"], crawl.local_root, timeout)
+                elif runner == "python":
+                    res = run_python(b.code, doc["href"], crawl.local_root, timeout)
+                    if not res["ok"] and earlier and "NameError" in (res.get("stderr") or ""):
+                        again = run_python("\n\n".join([*earlier, b.code]), doc["href"], crawl.local_root, timeout)
+                        again["ran_after_earlier_blocks"] = len(earlier)
+                        res = again
+                    earlier.append(b.code)
+                else:
+                    res = run_shell(b.code, doc["href"], crawl.local_root, timeout)
+                results.append({**base, **res})
     return results
 
 
-def run_claim_checks(crawl: Crawl, max_queries: int, timeout: int) -> list[dict]:
+def run_claim_checks(crawl: Crawl, max_blocks: int, timeout: int) -> list[dict]:
     """Run each claim check. A check that returns rows means the claim is false."""
     results = []
     for n in crawl.nodes:
         for kind in ("README.md", "AGENTS.md"):
             doc = n.get(kind) or {}
             for c in doc.get("_claim_checks") or []:
-                if len(results) >= max_queries:
+                if len(results) >= max_blocks:
                     results.append({"node": n["path"] or ".", "doc": kind, "line": c["line"], "ok": None, "error": "not run, over the limit"})
                     continue
                 res = run_sql(c["sql"], doc["href"], crawl.local_root, timeout)
@@ -945,10 +1060,12 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--rashid", default=None, help="command that runs rashid (default: rashid on PATH, else uvx rashid)")
     ap.add_argument("--no-rashid", action="store_true", help="skip the rashid run")
     ap.add_argument("--rashid-data", action="store_true", help="let rashid read every asset (slow on large catalogs)")
-    ap.add_argument("--no-queries", action="store_true", help="do not run the SQL in the documentation")
+    ap.add_argument("--no-code", action="store_true", help="do not run the code in the documentation")
+    ap.add_argument("--run-shell", action="store_true", help="also run the shell blocks in the documentation")
+    ap.add_argument("--registry-submission", action="store_true", help="the catalog is being submitted to the registry, so it cannot be registered yet")
     ap.add_argument("--no-links", action="store_true", help="do not probe links")
     ap.add_argument("--no-registry", action="store_true", help="do not look the catalog up in the registry")
-    ap.add_argument("--max-queries", type=int, default=60)
+    ap.add_argument("--max-blocks", type=int, default=80, help="code blocks and claim checks to run, each")
     ap.add_argument("--max-links", type=int, default=600)
     ap.add_argument("--max-nodes", type=int, default=400)
     ap.add_argument("--timeout", type=int, default=120, help="seconds per query and per fetch")
@@ -1032,20 +1149,23 @@ def main(argv: list[str] | None = None) -> int:
             "not_checked": [r for r in results if r.get("ok") is None],
         }
 
-    facts["queries"] = [] if args.no_queries else run_doc_queries(crawl, args.max_queries, args.timeout)
-    facts["claim_checks"] = [] if args.no_queries else run_claim_checks(crawl, args.max_queries, args.timeout)
+    facts["queries"] = [] if args.no_code else run_doc_code(crawl, args.max_blocks, args.timeout, args.run_shell)
+    facts["claim_checks"] = [] if args.no_code else run_claim_checks(crawl, args.max_blocks, args.timeout)
+    ran = {(q["node"], q["doc"], q["line"]) for q in facts["queries"]}
     facts["code_blocks_not_run"] = [
         {"node": n["path"] or ".", "doc": kind, "lang": b.lang or "(none)", "line": b.line}
         for n in crawl.nodes
         for kind in ("README.md", "AGENTS.md")
         if n.get(kind) and n[kind].get("_blocks")
         for b in n[kind]["_blocks"]
-        if b.lang not in SQL_LANGS
+        if (n["path"] or ".", kind, b.line) not in ran
     ]
     facts["agents_similarity"] = similarity(crawl.nodes, "AGENTS.md")
     facts["readme_similarity"] = similarity(crawl.nodes, "README.md")
 
-    if args.no_registry or local_root:
+    if args.registry_submission:
+        facts["registry"] = {"submission": True}
+    elif args.no_registry or local_root:
         facts["registry"] = {"skipped": True}
     else:
         got = fetch(REGISTRY_EXPORT, args.timeout)
@@ -1069,8 +1189,9 @@ def main(argv: list[str] | None = None) -> int:
     facts["summary"] = {
         "catalogs": sum(1 for n in crawl.nodes if n["type"] == "Catalog"),
         "collections": sum(1 for n in crawl.nodes if n["type"] == "Collection"),
-        "queries_run": sum(1 for q in facts["queries"] if q.get("ok") is not None),
-        "queries_failed": sum(1 for q in facts["queries"] if q.get("ok") is False),
+        "code_blocks_run": sum(1 for q in facts["queries"] if q.get("ok") is not None),
+        "code_blocks_failed": sum(1 for q in facts["queries"] if q.get("ok") is False and not q.get("environment_error")),
+        "code_blocks_environment_errors": sum(1 for q in facts["queries"] if q.get("environment_error")),
         "claim_checks_failed": sum(1 for q in facts["claim_checks"] if q.get("claim_holds") is False),
         "links_broken": len(facts["links"].get("broken", [])),
         "links_unverified": len(facts["links"].get("unreachable", [])) + len(facts["links"].get("refused", [])),
@@ -1078,6 +1199,9 @@ def main(argv: list[str] | None = None) -> int:
         "seconds": round(time.time() - started, 1),
     }
     (OUT_DIR / "facts.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False))
+    import shutil
+
+    shutil.rmtree(OUT_DIR / "work", ignore_errors=True)  # does not follow the links into the catalog
     print(f"wrote {OUT_DIR / 'facts.json'}")
     print(json.dumps(facts["summary"], indent=2))
     return 0

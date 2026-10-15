@@ -49,6 +49,27 @@ SELECT kind, count(*) AS n FROM read_parquet('data.parquet') GROUP BY kind ORDER
 
 -- road 3, river 2.
 
+```python
+import duckdb
+print(duckdb.sql("SELECT count(*) FROM 'data.parquet'").fetchall())
+```
+
+```python
+factor = 21
+```
+
+```python
+print(factor * 2)
+```
+
+```sql
+COPY (SELECT 1 AS one) TO 'written-by-docs.csv';
+```
+
+```bash
+touch shell-ran
+```
+
 Every feature has a kind.
 <!-- claim check: SELECT * FROM read_parquet('data.parquet') WHERE kind IS NULL -->
 
@@ -163,30 +184,23 @@ def test_comments_are_not_prose(facts_mod):
     assert [c["value"] for c in facts_mod.numeric_claims(md["prose"])] == ["900"]
 
 
-def test_prepare_sql_strips_install_and_resolves_relative_paths(facts_mod):
-    sql, exts, rewritten = facts_mod.prepare_sql(
-        "INSTALL spatial; LOAD spatial;\nSELECT * FROM read_parquet('data.parquet');", "https://h.example/c/AGENTS.md"
-    )
-    assert "INSTALL" not in sql and "LOAD" not in sql
+def test_prepare_sql_resolves_relative_paths_for_published_docs(facts_mod):
+    sql, rewritten = facts_mod.prepare_sql("SELECT * FROM read_parquet('data.parquet');", "https://h.example/c/AGENTS.md")
     assert "https://h.example/c/data.parquet" in sql
-    assert {"spatial", "httpfs"} <= set(exts)
     assert rewritten == ["data.parquet -> https://h.example/c/data.parquet"]
+    assert facts_mod.prepare_sql("SELECT 1", "/local/AGENTS.md") == ("SELECT 1", [])
 
 
-def test_sql_sandbox(facts_mod, catalog):
-    doc = str(catalog / "roads" / "AGENTS.md")
-    root = str(catalog)
-    ok = facts_mod.run_sql("SELECT count(*) FROM read_parquet('data.parquet')", doc, root, 60)
-    assert ok["ok"], ok
-    assert ok["rows"] == [["5"]]
-    for bad in (
-        "SELECT * FROM read_text('/etc/passwd')",
-        "SET enable_external_access = true",
-        "SET allowed_directories = ['/']",
-        "PRAGMA profiling_output = '/tmp/x.json'",
-    ):
-        got = facts_mod.run_sql(bad, doc, root, 60)
-        assert got["ok"] is False, bad
+def test_python_packages(facts_mod):
+    code = "import os, json\nimport geopandas as gpd\nfrom odc.stac import load\nfrom pystac_client import Client\n"
+    assert facts_mod.python_packages(code) == ["geopandas", "odc-stac", "pystac-client"]
+
+
+def test_environment_errors_are_classified(facts_mod):
+    got = facts_mod.classify({"ok": False}, 'IO Error: Failed to download extension "spatial"')
+    assert got["environment_error"] is True and got["missing_file"] is False
+    got = facts_mod.classify({"ok": False}, "FileNotFoundError: data.parquet")
+    assert got["environment_error"] is False and got["missing_file"] is True
 
 
 # ------------------------------------------------------------ end to end
@@ -209,10 +223,21 @@ def test_main_on_fixture(facts_mod, catalog, tmp_path):
     assert roads["table_columns"]["undescribed"] == ["n"]
     assert (out / roads["AGENTS.md"]["saved"]).read_text().startswith("# Agent guide, roads")
 
-    queries = [q for q in facts["queries"] if q["node"] == "roads"]
-    assert queries[0]["ok"] is True
-    assert queries[0]["rows"][0] == ["road", "3"]
-    assert queries[0]["followed_by"] == "-- road 3, river 2."
+    blocks = [q for q in facts["queries"] if q["node"] == "roads"]
+    sql, py_count, py_define, py_use, copy = blocks
+    assert sql["ok"] is True and sql["rows"][0] == ["road", "3"]
+    assert sql["followed_by"] == "-- road 3, river 2."
+    assert py_count["ok"] is True, py_count
+    assert "(5,)" in py_count["stdout"] and py_count["packages"] == ["duckdb"]
+    assert py_define["ok"] is True
+    assert py_use["ok"] is True and py_use["ran_after_earlier_blocks"] == 2
+    assert py_use["stdout"].strip().endswith("42")
+    assert copy["ok"] is True
+    # Code from the docs writes into a scratch directory, never the catalog.
+    assert not list(catalog.rglob("written-by-docs.csv"))
+    assert not (out / "work").exists()
+    # Shell blocks run only with --run-shell.
+    assert [b["lang"] for b in facts["code_blocks_not_run"] if b["node"] == "roads"] == ["bash"]
 
     checks = {(c["node"], c["line"]): c["claim_holds"] for c in facts["claim_checks"]}
     assert sorted(checks.values(), key=str) == [False, False, True, True]
@@ -224,7 +249,19 @@ def test_main_on_fixture(facts_mod, catalog, tmp_path):
     assert broken == {"missing-license.txt"}
     assert facts["summary"]["thumbnails_likely_blank"] == ["rivers"]
     assert facts["registry"] == {"skipped": True}
+    assert facts["summary"]["code_blocks_failed"] == 0
     assert facts["rashid"] == {"skipped": True}
+
+
+def test_shell_and_registry_submission(facts_mod, catalog, tmp_path):
+    out = tmp_path / "out2"
+    args = [str(catalog), "--out", str(out), "--no-rashid", "--no-links", "--run-shell", "--registry-submission", "--timeout", "60"]
+    assert facts_mod.main(args) == 0
+    facts = json.loads((out / "facts.json").read_text())
+    shell = [q for q in facts["queries"] if q["lang"] == "bash"]
+    assert shell and all(q["ok"] for q in shell)
+    assert not list(catalog.rglob("shell-ran"))
+    assert facts["registry"] == {"submission": True}
 
 
 def test_repo_facts(facts_mod, tmp_path):

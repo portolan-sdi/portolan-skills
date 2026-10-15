@@ -24,9 +24,10 @@ Apply these steps in order. Record each step in the report's `computation` field
 3. **Combine.** The overall grade is the lowest area grade. Raise it one step when at least five of the other seven areas are A. The raise never goes above A.
 4. **Honesty cap.** One invented claim caps the grade at **C**. Two or more cap it at **D**.
 5. **Apply the ceiling** from step 1.
-6. **A+.** A catalog at A after step 5 gets A+ only when it meets the full list of [A+ requirements](#a-requirements). Otherwise it stays at A.
+6. **A requirements.** A catalog at A after step 5 stays at A only when it meets the full list of [A requirements](#a-requirements). Otherwise it drops to **B**.
+7. **A+.** A catalog at A after step 6 gets A+ only when it meets the full list of [A+ requirements](#a-requirements-1). Otherwise it stays at A.
 
-A grade can only go down after step 3. Polish in one area does not make up for a defect in another, because the consumer who depends on the broken part never sees the polish.
+A grade can only go down from step 3 to step 6. Polish in one area does not make up for a defect in another, because the consumer who depends on the broken part never sees the polish.
 
 ## Invented claims
 
@@ -87,11 +88,11 @@ This area covers whether a reader can decide in one screen to trust and use the 
 
 ### 4. Access
 
-This area covers whether the documented queries run and show something useful. Read `facts.queries`. A query with `environment_error: true` failed because of the grader's environment. Do not count it against the catalog.
+This area covers whether the documented code runs and shows something useful. Read `facts.queries`, which lists each SQL and Python block the script ran. A block with `environment_error: true` failed because the grader could not install an extension or a package. Do not count it against the catalog.
 
-- **A.** The docs of each collection give at least one query against the published URL that runs, with a stated result that matches the real one. Where the data supports it, the docs also show one advanced pattern, such as the partition glob or a cross-collection join.
-- **B.** The queries run, but they are basic, or they read relative paths that the grader had to resolve (`relative_paths_resolved`). The docs should use the published URL.
-- **D.** The documented queries fail, all or most of them, or the docs give none.
+- **A.** The docs of each collection give at least one query or program against the published URL that runs, with a stated result that matches the real one. Where the data supports it, the docs also show one advanced pattern, such as the partition glob or a cross-collection join.
+- **B.** The code runs, but it is basic, or it reads relative paths. A SQL path the script resolved shows in `relative_paths_resolved`. A Python block that failed on a relative path shows `missing_file: true`. The docs should use the published URL.
+- **D.** The documented code fails, all or most of it, or the docs give none.
 
 ### 5. Visuals
 
@@ -135,15 +136,20 @@ This area covers whether each sentence is necessary. Length is not the defect. P
 - **B.** Some padding, or repeated sections across collections.
 - **D.** Most collection docs are near copies of each other (similarity 0.9 or more), or padding buries the useful content.
 
-## A+ requirements
+## A requirements
 
-A+ is for a catalog that a stranger can trust, query, and correct. Record each requirement as met, not met, or unknown in `a_plus.requirements`. Unknown counts as not met.
+An A catalog is one a stranger can find, trust, and correct. Record each requirement as met, not met, or unknown in `a_requirements`. Unknown counts as not met, so a catalog graded without its repository gets B or lower.
 
 - `git`: the catalog is built from the git repository the grader was given, and the root has `vcs` and `issues` links that match it.
-- `ci`: CI runs rashid on each pull request (`facts.repo.ci_validates_on_pull_request`). CI also runs the documented queries and claim checks against the published data on a schedule, as the [git-backed-catalog skill](../../git-backed-catalog/SKILL.md#test-the-documented-queries-and-claims) describes (`facts.repo.ci_checks_docs_on_schedule`). Read the workflow and the test to confirm both facts.
-- `rashid-clean`: rashid reports no errors and no warnings.
+- `ci`: CI runs rashid on each pull request (`facts.repo.ci_validates_on_pull_request`). CI also runs the documented code and claim checks against the published data on a schedule, as the [git-backed-catalog skill](../../git-backed-catalog/SKILL.md#test-the-documented-queries-and-claims) describes (`facts.repo.ci_checks_docs_on_schedule`). Read the workflow and the test to confirm both facts.
 - `logo`: the root has an `icon` link to a logo that loads and is clear at small size.
-- `no-invented-claims`: the grader found no invented claims.
+- `registry`: the catalog is in the Portolan registry (`facts.registry.registered`). When the grade is for a registry submission (`facts.registry.submission`), the requirement is met, because the catalog cannot be in the registry before the submission merges.
+
+## A+ requirements
+
+A+ is for a catalog that a stranger would choose over the alternatives. Record each requirement in `a_plus.requirements`, the same way.
+
+- `rashid-clean`: rashid reports no errors and no warnings.
 - `candid`: the docs evaluate the data as the [Candid Core Framework](https://lettersfromthreadedfoundry.substack.com/p/candid-core-framework) describes. Where they apply, the docs give these:
   - Suggested uses grounded in real applications.
   - Inappropriate uses.
@@ -153,4 +159,4 @@ A+ is for a catalog that a stranger can trust, query, and correct. Record each r
 - `narrative`: the READMEs describe the world the data represents, not only its schema.
 - `experience`: the thumbnails pass the visual gate and the styles show different aspects of the data. An advanced access pattern runs.
 
-Registration in the Portolan registry is reported as `facts.registry`. It is not required.
+An A+ catalog has no invented claims, because one invented claim caps the grade at C.

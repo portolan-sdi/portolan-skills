@@ -16,12 +16,14 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   maintenance, and concision. `scripts/collect_facts.py` measures the
   checkable facts, such as the rashid result, link status, thumbnail pixels,
   legend labels against the data, the PMTiles zoom range, the result of each
-  SQL query in the documents, document similarity, and the repository's CI.
+  SQL and Python block in the documents, document similarity, and the
+  repository's CI.
   The grader judges the rest, and every finding quotes its evidence. One
-  invented claim caps the grade at C, two or more at D. A+ needs a git
+  invented claim caps the grade at C, two or more at D. A needs a git
   repository whose CI runs rashid on pull requests and runs the documented
-  queries and claim checks on a schedule. `reference/report.schema.json`
-  defines the JSON report, so evals can score it.
+  code and claim checks on a schedule, a logo, and registration in the
+  registry. `reference/report.schema.json` defines the JSON report, so evals
+  can score it.
 - `reference/rubric.md` replaces `specs/best-practices/grader.md`, which
   leaves the specification.
 
