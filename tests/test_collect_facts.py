@@ -1,0 +1,255 @@
+"""skills/catalog-grader/scripts/collect_facts.py against a catalog built in tmp_path. No network."""
+
+from __future__ import annotations
+
+import importlib.util
+import io
+import json
+import struct
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+duckdb = pytest.importorskip("duckdb")
+Image = pytest.importorskip("PIL.Image")
+
+ROOT = Path(__file__).resolve().parent.parent
+SCRIPT = ROOT / "skills" / "catalog-grader" / "scripts" / "collect_facts.py"
+
+
+@pytest.fixture(scope="session")
+def facts_mod():
+    spec = importlib.util.spec_from_file_location("collect_facts", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["collect_facts"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def png(color=(255, 255, 255), size=(300, 200), stripes=False) -> bytes:
+    img = Image.new("RGB", size, color)
+    if stripes:
+        for x in range(0, size[0], 10):
+            for y in range(size[1]):
+                img.putpixel((x, y), ((x * 7) % 255, (y * 3) % 255, 90))
+    buf = io.BytesIO()
+    img.save(buf, "PNG")
+    return buf.getvalue()
+
+
+AGENTS = """# Agent guide, {title}
+
+Query the data with DuckDB. The key column is `kind`.
+
+```sql
+SELECT kind, count(*) AS n FROM read_parquet('data.parquet') GROUP BY kind ORDER BY n DESC;
+```
+
+-- road 3, river 2.
+
+Every feature has a kind.
+<!-- claim check: SELECT * FROM read_parquet('data.parquet') WHERE kind IS NULL -->
+
+Every n is below 5.
+<!--
+SELECT * FROM read_parquet('data.parquet') WHERE n >= 5
+-->
+"""
+
+
+def collection(tmp: Path, name: str, labels: list[str], thumb: bytes) -> dict:
+    d = tmp / name
+    (d / "styles").mkdir(parents=True)
+    con = duckdb.connect()
+    con.execute(
+        f"COPY (SELECT * FROM (VALUES ('road', 1), ('road', 2), ('road', 3), ('river', 4), ('river', 5)) t(kind, n)) "
+        f"TO '{d / 'data.parquet'}' (FORMAT parquet)"
+    )
+    (d / "thumbnail.png").write_bytes(thumb)
+    style = {"version": 8, "layers": [{"id": "f", "type": "fill", "paint": {"fill-color": ["match", ["get", "kind"], *sum(([lab, "#f00"] for lab in labels), []), "#ccc"]}}]}
+    (d / "styles" / "kind.json").write_text(json.dumps(style))
+    (d / "README.md").write_text(f"# {name}\n\nAll 5 features of {name}, from [the source](https://example.com/{name}).\n")
+    (d / "AGENTS.md").write_text(AGENTS.format(title=name))
+    coll = {
+        "type": "Collection", "stac_version": "1.1.0", "id": name, "title": name, "description": f"{name} lines.",
+        "license": "CC0-1.0", "extent": {"spatial": {"bbox": [[-71.2, 42.2, -70.9, 42.4]]}, "temporal": {"interval": [[None, None]]}},
+        "table:row_count": 5,
+        "table:columns": [{"name": "kind", "type": "varchar", "description": "Feature kind."}, {"name": "n", "type": "int"}],
+        "links": [
+            {"rel": "root", "href": "../catalog.json"},
+            {"rel": "agents", "href": "./AGENTS.md", "type": "text/markdown"},
+            {"rel": "describedby", "href": "./README.md", "type": "text/markdown"},
+            {"rel": "license", "href": "./missing-license.txt"},
+        ],
+        "assets": {
+            "data": {"href": "./data.parquet", "type": "application/vnd.apache.parquet", "roles": ["data"]},
+            "thumbnail": {"href": "./thumbnail.png", "type": "image/png", "roles": ["thumbnail"]},
+            "style-kind": {"href": "./styles/kind.json", "type": "application/vnd.mapbox.style+json", "roles": ["style", "default"]},
+        },
+    }
+    (d / "collection.json").write_text(json.dumps(coll))
+    return {"rel": "child", "href": f"./{name}/collection.json", "type": "application/json"}
+
+
+@pytest.fixture
+def catalog(tmp_path: Path) -> Path:
+    cat = tmp_path / "cat"
+    cat.mkdir()
+    children = [
+        collection(cat, "roads", ["road", "river", "ghost"], png(stripes=True)),
+        collection(cat, "rivers", ["road", "river"], png()),
+    ]
+    (cat / "README.md").write_text("# Test\n\nTwo collections, 10 features in 2026.\n")
+    (cat / "AGENTS.md").write_text("# Agents\n")
+    (cat / "catalog.json").write_text(json.dumps({
+        "type": "Catalog", "stac_version": "1.1.0", "id": "t", "description": "t",
+        "links": [
+            {"rel": "root", "href": "./catalog.json"},
+            {"rel": "agents", "href": "./AGENTS.md", "type": "text/markdown"},
+            {"rel": "describedby", "href": "./README.md", "type": "text/markdown"},
+            {"rel": "vcs", "href": "https://github.com/example/cat"},
+            *children,
+        ],
+    }))
+    return cat
+
+
+# ------------------------------------------------------------------ units
+
+
+def test_blank_and_real_images(facts_mod):
+    assert facts_mod.image_facts(png())["likely_blank"] is True
+    real = facts_mod.image_facts(png(stripes=True))
+    assert real["likely_blank"] is False
+    assert real["aspect"] == 1.5
+
+
+def test_style_match_labels_include_list_labels(facts_mod):
+    style = {"layers": [{"type": "fill", "paint": {"fill-color": ["match", ["to-string", ["get", "c"]], ["a", "b"], "#111", "z", "#222", "#000"]}}]}
+    got = facts_mod.style_facts(style)
+    assert got["match_labels"] == {"c": ["a", "b", "z"]}
+    assert got["layer_types"] == ["fill"]
+
+
+def test_full_extent_zoom(facts_mod):
+    assert facts_mod.full_extent_zoom([-180, -85, 180, 85]) == 0
+    assert 10 <= facts_mod.full_extent_zoom([-71.2, 42.2, -70.9, 42.4]) <= 12
+
+
+def test_pmtiles_header(facts_mod):
+    head = bytearray(127)
+    head[:7] = b"PMTiles"
+    head[7] = 3
+    head[99] = 1
+    head[100], head[101] = 6, 14
+    head[102:118] = struct.pack("<iiii", -712000000, 422000000, -709000000, 424000000)
+    got = facts_mod.pmtiles_header(bytes(head))
+    assert (got["tile_type"], got["min_zoom"], got["max_zoom"]) == ("mvt", 6, 14)
+    assert got["bounds"][0] == pytest.approx(-71.2)
+    assert facts_mod.pmtiles_header(b"nope" * 40) is None
+
+
+def test_numeric_claims_skip_years_and_list_markers(facts_mod):
+    prose = [(1, "1. First item"), (2, "All 63,073 monuments, surveyed in 2024."), (3, "Coverage is 85% of parcels.")]
+    values = [c["value"] for c in facts_mod.numeric_claims(prose)]
+    assert values == ["63,073", "85"]
+
+
+def test_comments_are_not_prose(facts_mod):
+    md = facts_mod.parse_markdown("Intro.\n<!-- 12345 rows: SELECT 1 -->\nAll 900 rows.\n<!--\nmulti\nline -->\n")
+    assert [c["text"] for c in md["comments"]] == ["12345 rows: SELECT 1", "multi\nline"]
+    assert [c["value"] for c in facts_mod.numeric_claims(md["prose"])] == ["900"]
+
+
+def test_prepare_sql_strips_install_and_resolves_relative_paths(facts_mod):
+    sql, exts, rewritten = facts_mod.prepare_sql(
+        "INSTALL spatial; LOAD spatial;\nSELECT * FROM read_parquet('data.parquet');", "https://h.example/c/AGENTS.md"
+    )
+    assert "INSTALL" not in sql and "LOAD" not in sql
+    assert "https://h.example/c/data.parquet" in sql
+    assert {"spatial", "httpfs"} <= set(exts)
+    assert rewritten == ["data.parquet -> https://h.example/c/data.parquet"]
+
+
+def test_sql_sandbox(facts_mod, catalog):
+    doc = str(catalog / "roads" / "AGENTS.md")
+    root = str(catalog)
+    ok = facts_mod.run_sql("SELECT count(*) FROM read_parquet('data.parquet')", doc, root, 60)
+    assert ok["ok"], ok
+    assert ok["rows"] == [["5"]]
+    for bad in (
+        "SELECT * FROM read_text('/etc/passwd')",
+        "SET enable_external_access = true",
+        "SET allowed_directories = ['/']",
+        "PRAGMA profiling_output = '/tmp/x.json'",
+    ):
+        got = facts_mod.run_sql(bad, doc, root, 60)
+        assert got["ok"] is False, bad
+
+
+# ------------------------------------------------------------ end to end
+
+
+def test_main_on_fixture(facts_mod, catalog, tmp_path):
+    out = tmp_path / "out"
+    assert facts_mod.main([str(catalog), "--out", str(out), "--no-rashid", "--timeout", "60"]) == 0
+    facts = json.loads((out / "facts.json").read_text())
+    nodes = {n["path"]: n for n in facts["nodes"]}
+    assert set(nodes) == {"", "roads", "rivers"}
+
+    roads, rivers = nodes["roads"], nodes["rivers"]
+    assert roads["parquet_row_count"] == 5 == roads["table_row_count"]
+    [check] = roads["legend_checks"]
+    assert check["labels_absent_from_data"] == ["ghost"]
+    assert rivers["legend_checks"][0]["labels_absent_from_data"] == []
+    assert rivers["thumbnail"]["likely_blank"] is True
+    assert roads["thumbnail"]["likely_blank"] is False
+    assert roads["table_columns"]["undescribed"] == ["n"]
+    assert (out / roads["AGENTS.md"]["saved"]).read_text().startswith("# Agent guide, roads")
+
+    queries = [q for q in facts["queries"] if q["node"] == "roads"]
+    assert queries[0]["ok"] is True
+    assert queries[0]["rows"][0] == ["road", "3"]
+    assert queries[0]["followed_by"] == "-- road 3, river 2."
+
+    checks = {(c["node"], c["line"]): c["claim_holds"] for c in facts["claim_checks"]}
+    assert sorted(checks.values(), key=str) == [False, False, True, True]
+    assert facts["summary"]["claim_checks_failed"] == 2
+    assert roads["AGENTS.md"]["claim_check_count"] == 2
+
+    assert facts["agents_similarity"][0]["ratio"] == 1.0
+    broken = {Path(b["target"]).name for b in facts["links"]["broken"]}
+    assert broken == {"missing-license.txt"}
+    assert facts["summary"]["thumbnails_likely_blank"] == ["rivers"]
+    assert facts["registry"] == {"skipped": True}
+    assert facts["rashid"] == {"skipped": True}
+
+
+def test_repo_facts(facts_mod, tmp_path):
+    repo = tmp_path / "repo"
+    wf = repo / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("on:\n  pull_request:\n  push:\njobs:\n  v:\n    steps:\n      - run: rashid check catalog/\n")
+    (wf / "docs.yml").write_text("on:\n  schedule:\n    - cron: '0 6 * * 1'\njobs:\n  d:\n    steps:\n      - run: pytest tests/test_queries.py\n")
+    (repo / "tests").mkdir()
+    (repo / "tests" / "test_queries.py").write_text("import duckdb, pathlib\nfor md in pathlib.Path('catalog').rglob('*.md'):\n    pass\n")
+    (repo / "catalog.parquet").write_text("x")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-qm", "init"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", "git@github.com:example/cat.git"], check=True)
+    got = facts_mod.repo_facts(repo, "https://github.com/example/cat")
+    assert got["is_git"] is True
+    assert got["vcs_link_matches_remote"] is True
+    assert got["ci_validates_on_pull_request"] is True
+    ci, docs = got["workflows"]
+    assert ci["triggers"] == ["pull_request", "push"]
+    assert docs["scheduled"] is True and "text" not in docs
+    assert got["tests_run_doc_queries"] == ["tests/test_queries.py"]
+    assert got["ci_checks_docs_on_schedule"] is True
+    assert got["tracked_data_files"] == ["catalog.parquet"]

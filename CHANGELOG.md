@@ -11,6 +11,24 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   claim check in the catalog docs against the published data. The check runs on
   each pull request, on a schedule, and after each upload. A failed scheduled
   run opens one tracking issue (#33).
+- `catalog-grader` grades a published catalog from A+ to F on what rashid
+  cannot check: honesty, documentation, access, visuals, organization,
+  maintenance, and concision. `scripts/collect_facts.py` measures the
+  checkable facts, such as the rashid result, link status, thumbnail pixels,
+  legend labels against the data, the PMTiles zoom range, the result of each
+  SQL query in the documents, document similarity, and the repository's CI.
+  The grader judges the rest, and every finding quotes its evidence. One
+  invented claim caps the grade at C, two or more at D. A+ needs a git
+  repository whose CI runs rashid on pull requests and runs the documented
+  queries and claim checks on a schedule. `reference/report.schema.json`
+  defines the JSON report, so evals can score it.
+- `reference/rubric.md` replaces `specs/best-practices/grader.md`, which
+  leaves the specification.
+
+### Changed
+
+- `portolan-bootstrap` grades the catalog with `catalog-grader` instead of
+  the specification's grader page.
 
 ## 0.5.0 - 2026-10-06
 
