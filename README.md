@@ -1,143 +1,171 @@
-# Portolan Skills
+# Portolan skills
 
-AI agent skills for working with [Portolan](https://github.com/portolan-sdi/portolan-spec) cloud-native geospatial data catalogs.
+[Overview](#overview) · [Quickstart](#quickstart) · [Installation](#installation) · [Skills](#skills) · [Evaluations](#evaluations)
 
-Skills use the [Agent Skills](https://github.com/anthropics/skills) open standard (`SKILL.md` format), which works across multiple AI coding tools.
+## Overview
 
-The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
+This repository gives your coding agent workflows for building, publishing, reviewing, and using [Portolan](https://www.portolan-sdi.org/) geospatial data catalogs. Give your agent a source URL or a folder of files to turn into a documented catalog.
 
-Use the [skill evaluations](evals/README.md) to test whether a change improves a skill's results.
+The skills cover data conversion, metadata research, Git-backed catalogs, map thumbnails, Source Cooperative uploads, catalog reviews, and data analysis. Each directory in [`skills/`](skills/) contains a `SKILL.md` file. Some also include scripts and reference material. They follow the [Agent Skills format](https://agentskills.io/), with installation options for Claude Code, Codex, Gemini CLI, and other agents.
+
+[`evals/`](evals/README.md) contains the catalog-grader evaluation suite. [`pins.toml`](pins.toml) records the upstream versions the skills describe, and [`scripts/check_drift.py`](scripts/check_drift.py) checks their commands and specification references against those versions. Catalog requirements come from the [Portolan specification](https://github.com/portolan-sdi/portolan-spec).
+
+## Quickstart
+
+This example uses [Claude Code](https://code.claude.com/docs/en/setup) and [uv](https://docs.astral.sh/uv/getting-started/installation/). Install both before you begin. For other agents, follow [Installation](#installation), then adapt the skill invocation in the prompt.
+
+1. Install the Portolan plugin and `portolan-cli` from your terminal:
+
+   ```bash
+   claude plugin marketplace add portolan-sdi/portolan-skills
+   claude plugin install portolan@portolan-skills
+   uv tool install portolan-cli
+   portolan --version
+   ```
+
+2. Open a working directory and start a new session:
+
+   ```bash
+   mkdir my-catalog-work
+   cd my-catalog-work
+   claude
+   ```
+
+3. Run the bootstrap skill in the agent session. Replace the source placeholder with a data URL or local path:
+
+   ```text
+   /portolan:portolan-bootstrap
+
+   Build a Portolan catalog from <data portal, service URL, or local folder>.
+   Use git-backed-catalog to create a GitHub repository for the metadata,
+   with validation in CI and data files in object storage.
+   Use the bootstrap guidance to research the source, convert the data,
+   and write metadata, documentation, and map styles.
+   Use portolan-thumbnails to generate and visually check the thumbnails.
+   I plan to host the catalog and data on Source Cooperative; use
+   sourcecoop for its account and authentication setup.
+   Ask me for the repository names, license, and maintainer contact.
+   Show me the plan and upload preview before publishing.
+   ```
+
+   If you use another storage provider, replace the Source Cooperative request with your destination. Source Cooperative hosting requires an account with write access to the destination repository.
+
+4. Review the agent's source research, proposed collections, license, and storage plan. The Git-backed workflow starts from the [catalog template](https://github.com/portolan-sdi/portolan-catalog-template) and keeps metadata under version control. Bootstrap directs this work to `git-backed-catalog`, which owns repository setup, validation, and publishing. Use the template's publishing tools throughout that workflow.
+
+5. After publication, open the catalog in the [Portolan browser](https://browser.portolan-sdi.org/) and check its maps, thumbnails, and download links. Ask your agent to use `catalog-grader` for a quality review, then `register-catalog` if you want to submit it to the registry.
+
+See the [CLI documentation](https://cli.portolan-sdi.org/) for conversion and publishing commands. The [thumbnail skill requirements](skills/portolan-thumbnails/SKILL.md#requirements) include Node.js 24.12 or later, npm, and an agent that can view images. The [Source Cooperative skill](skills/sourcecoop/SKILL.md#prerequisites) covers its CLI, access, and authentication setup.
+
+## Installation
+
+Choose the instructions for your agent. Copy whole skill directories so the agent can use their scripts and reference files.
+
+### Claude CLI
+
+For Claude Code, use the plugin commands in the [quickstart](#quickstart), then start a new session. Skills use the `portolan:` prefix: `/portolan:portolan-bootstrap` builds a catalog, and `/portolan:reading-portolan` helps you use one.
+
+See [Claude Code plugin installation](https://code.claude.com/docs/en/discover-plugins) for installation scopes and updates.
+
+### Claude web and desktop apps
+
+1. Open **Customize**, then **Plugins**.
+2. Select **Add**, **Add marketplace**, then **Add from a repository**.
+3. Enter `portolan-sdi/portolan-skills` and install the **Portolan** plugin.
+
+See [Use plugins in Claude](https://support.claude.com/en/articles/13837440-use-plugins-in-claude) for account and workspace requirements. For workflows that run local tools or process files, use Cowork or Claude Code with access to your working directory.
+
+### Codex
+
+From the root of the project where you want to use the skills, run:
+
+```bash
+skills_checkout=$(mktemp -d)
+git clone https://github.com/portolan-sdi/portolan-skills.git "$skills_checkout"
+mkdir -p .agents/skills
+cp -R "$skills_checkout"/skills/. .agents/skills/
+```
+
+Codex discovers skills in `.agents/skills/`. Invoke one by name, for example `$portolan-bootstrap`, or describe your task so Codex can select it. For installation across your projects, use `~/.agents/skills/` as the destination. See the [official skill documentation](https://learn.chatgpt.com/docs/build-skills) for discovery and invocation details.
+
+### Gemini CLI
+
+Install a skill at user scope:
+
+```bash
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/portolan-bootstrap --consent
+```
+
+Repeat the command with a directory from the [skills list](#skills) for each skill you need. For the quickstart, also install `git-backed-catalog`, `portolan-cli`, `portolan-thumbnails`, and `sourcecoop`. Add `--scope workspace` to install for the current project. See [Gemini CLI skills](https://geminicli.com/docs/cli/skills/) for discovery and management.
+
+### Other agents
+
+If your agent supports Agent Skills, install the skill directories in its documented location. Otherwise, add the relevant `SKILL.md` content to its custom instructions and make the supporting scripts and references available in the workspace.
 
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
-### `catalog-grader`
-
-Grade a published Portolan catalog from A+ to F and explain each finding with evidence. Use this skill when you need to review catalog quality, including a registry submission.
-
-### `customize-portolan-browser`
-
-Adapt a portolan-browser checkout into a publisher-branded interface for one existing Portolan catalog. Inspect the catalog, the browser, and the publisher's site, propose a design, wait for approval, then implement it through browser configuration before site-local code. Use when someone wants a custom, branded, or white-labeled STAC or Portolan browser for a catalog that already exists.
-
-### `enrich-metadata`
-
-Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. A script finds the record in a JKAN, CKAN, or Socrata portal. The skill covers the decisions the script cannot make - bundled records, producer versus uploader, copied records, broken licenses, and notices mixed into descriptions.
-
-### `git-backed-catalog`
-
-Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
-
-### `portolan-bootstrap`
-
-Build a complete, well-documented Portolan catalog from a data source. Research the data and its publisher, convert to cloud-native formats, write the documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
-
-### `portolan-cli`
-
-Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. Covers init, add, check, push, pull, sync, partitioning, and format conversion workflows.
-
-### `portolan-migrate`
-
-Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. Audit what is there, decide whether to patch or re-extract, repair metadata, styles and data, prove conformance, then republish and prune what went stale. Use when a catalog already exists and does not meet the spec, when a dataset was published before Portolan, or when someone says a catalog needs migrating, upgrading, or fixing.
-
-### `portolan-thumbnails`
-
-Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). Renders the collection's default style server-side over the PMTiles the collection links to, with an optional basemap, frames every bbox to the browser card's 3:2 shape, accepts an image only after an automated blank probe and a visual review, then refreshes file:size and file:checksum with portolan check and its fix flag. Requires Node.js 24.12 or newer.
-
-### `reading-portolan`
-
-Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). Covers AGENTS.md and STAC metadata, assets by role, DuckDB queries over GeoParquet and Parquet, COGs, cross-dataset joins, partitioned collections, and interactive maps with PMTiles and MapLibre.
-
-### `register-catalog`
-
-Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file.
-
-### `report-catalog-issue`
-
-Report a problem with a catalog registered in the Portolan registry by opening a catalog feedback issue against it.
-
-### `sourcecoop`
-
-Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI.
-
+| Skill | What it does |
+|---|---|
+| [`catalog-grader`](skills/catalog-grader/SKILL.md) | Grade a published Portolan catalog from A+ to F and explain each finding with evidence. |
+| [`customize-portolan-browser`](skills/customize-portolan-browser/SKILL.md) | Adapt a portolan-browser checkout into a publisher-branded interface for one existing Portolan catalog. |
+| [`enrich-metadata`](skills/enrich-metadata/SKILL.md) | Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. |
+| [`git-backed-catalog`](skills/git-backed-catalog/SKILL.md) | Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. |
+| [`portolan-bootstrap`](skills/portolan-bootstrap/SKILL.md) | Build a complete, well-documented Portolan catalog from a data source. |
+| [`portolan-cli`](skills/portolan-cli/SKILL.md) | Use when publishing, managing, or converting cloud-native geospatial data catalogs with the Portolan CLI. |
+| [`portolan-migrate`](skills/portolan-migrate/SKILL.md) | Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. |
+| [`portolan-thumbnails`](skills/portolan-thumbnails/SKILL.md) | Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). |
+| [`reading-portolan`](skills/reading-portolan/SKILL.md) | Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). |
+| [`register-catalog`](skills/register-catalog/SKILL.md) | Register a Portolan catalog in the Portolan registry by opening a pull request that adds a catalog entry file. |
+| [`report-catalog-issue`](skills/report-catalog-issue/SKILL.md) | Report a problem with a catalog registered in the Portolan registry by opening a catalog feedback issue against it. |
+| [`sourcecoop`](skills/sourcecoop/SKILL.md) | Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI. |
 <!-- END GENERATED: skills -->
 
-## Install
+## Evaluations
 
-### Claude Code (CLI & Desktop)
+Use these evals with the workflow in [Automating eval design and hillclimbing with Claude](https://claude.dev/blog/automating-eval-design-and-hillclimbing/). Measure a baseline, change a skill, and compare the results. The goal is to build evaluations for every skill and improve both the skills and their evaluations over time.
 
-```bash
-claude plugin marketplace add portolan-sdi/portolan-skills
-claude plugin install portolan
-```
-
-Skills become available under the `portolan:` prefix: `portolan:catalog-grader`, `portolan:customize-portolan-browser`, `portolan:enrich-metadata`, `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
-
-### Claude.ai (web and desktop apps)
-
-Claude.ai supports plugin marketplaces directly, including in Cowork:
-
-1. Open **Settings → Customize** (or the **Customize** panel in Cowork)
-2. Go to the **Plugins** tab
-3. Select **Add → Add marketplace → Add from a repository**
-4. Enter `portolan-sdi/portolan-skills`
-5. Install the **Portolan** plugin from the marketplace
-
-The skills then become available in your Claude sessions, including Cowork.
-
-### Gemini CLI
-
-Gemini CLI natively supports the same `SKILL.md` format:
+The current suite covers `catalog-grader`. The [catalog-grader eval](evals/catalog-grader/README.md) tests the skill against saved catalog facts and maintainer-approved expected results. Scorer tests run without model calls:
 
 ```bash
-# Install skills at user scope
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/catalog-grader --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/customize-portolan-browser --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/enrich-metadata --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/git-backed-catalog --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-bootstrap --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-cli --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-migrate --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/portolan-thumbnails --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/reading-portolan --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/register-catalog --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/report-catalog-issue --consent
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/sourcecoop --consent
-
-# Or at workspace scope (shared via version control)
-gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
-  --path skills/reading-portolan --scope workspace --consent
+node --test evals/*/*.test.mjs
 ```
 
-### OpenAI Codex CLI
+For a full evaluation, you need Node.js 20 or later, uv, and authenticated Claude Code 2.1.300 or later. Each case starts a paid Claude Code session. Follow the [eval authentication instructions](evals/catalog-grader/README.md#run) before running these commands from this repository's root:
 
-Codex CLI also supports `SKILL.md` files. Copy the skills into your project's `.agents/skills/` directory:
+1. Download the frozen inputs and run the unchanged skill as a baseline:
+
+   ```bash
+   evals/_lib/frozen.sh fetch evals/catalog-grader
+   node evals/catalog-grader/run-eval.mjs \
+     --flow .claude/hillclimb/catalog-grader \
+     --variant baseline --model claude-opus-5-5 \
+     --reps 2 --concurrency 3
+   ```
+
+   If the runner requests harness approval, review the files it lists, then repeat the command with `--approve-harness` for one run.
+
+2. Edit the skill, then repeat the runner command with `--variant v1`. Keep the model, case selection, and repetition count the same for comparison.
+
+3. Build the report and print both summaries:
+
+   ```bash
+   node evals/_lib/build-report-lite.mjs .claude/hillclimb/catalog-grader/
+   python3 evals/catalog-grader/summary.py \
+     .claude/hillclimb/catalog-grader/baseline \
+     .claude/hillclimb/catalog-grader/v1
+   ```
+
+   Open `.claude/hillclimb/catalog-grader/report.html` to compare the results. Include both summaries in your pull request's **Verification** section.
+
+You can also run the [Eval catalog-grader workflow](https://github.com/portolan-sdi/portolan-skills/actions/workflows/eval-catalog-grader.yml), which uploads the results as an artifact. See the [evaluation guide](evals/README.md) for frozen input releases and changes to expected results.
+
+Before submitting a change, check the skills against the pinned upstreams:
 
 ```bash
-# Clone and copy into your project
-git clone https://github.com/portolan-sdi/portolan-skills.git /tmp/portolan-skills
-mkdir -p .agents/skills
-cp -r /tmp/portolan-skills/skills/* .agents/skills/
+uv run scripts/check_drift.py
 ```
-
-### Any AI Agent (Manual)
-
-The skills are just markdown files. For any AI coding tool that supports custom instructions or system prompts:
-
-1. Copy the content of the relevant `SKILL.md` file
-2. Add it to your tool's custom instructions, system prompt, or project context file (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `.cursorrules`, etc.)
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE)

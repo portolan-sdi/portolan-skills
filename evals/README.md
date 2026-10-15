@@ -1,5 +1,17 @@
 # Skill evaluations
 
+Use these evaluations with the workflow in
+[Automating eval design and hillclimbing with Claude](https://claude.dev/blog/automating-eval-design-and-hillclimbing/).
+The goal is to build evaluations for every skill and improve both the skills
+and their evaluations over time. The current suite covers
+[`catalog-grader`](catalog-grader/README.md).
+
+Use `/claude-api build-eval` in Claude Code to design an evaluation for a skill,
+with representative tasks and a grader that maintainers review.
+Use `/claude-api hillclimb` to improve a skill against its evaluation, one
+change at a time. Check results on held-out cases to assess whether an
+improvement extends beyond the cases used to guide the edits.
+
 Each evaluation runs test cases against saved inputs and compares the output
 with maintainer-approved expected results. To run one, follow the
 [catalog-grader instructions](catalog-grader/README.md). The runner saves
