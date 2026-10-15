@@ -7,11 +7,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `git-backed-catalog` adds a check that runs every SQL block in the catalog
-  docs against the published data, and a `claim-check` comment that tests a
-  stated fact about the data. CI runs the check on each pull request, and a
-  scheduled workflow runs it every week. A failed run opens one tracking issue
-  (#33).
+- `git-backed-catalog` tells the agent to add a check that runs every query and
+  claim check in the catalog docs against the published data. The check runs on
+  each pull request, on a schedule, and after each upload. A failed scheduled
+  run opens one tracking issue (#33).
 
 ## 0.5.0 - 2026-10-06
 
