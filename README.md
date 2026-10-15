@@ -123,7 +123,9 @@ If your agent supports Agent Skills, install the skill directories in its docume
 
 ## Evaluations
 
-The [catalog-grader eval](evals/catalog-grader/README.md) tests the skill against saved catalog facts and maintainer-approved expected results. Scorer tests run without model calls:
+Use these evals with the workflow in [Automating eval design and hillclimbing with Claude](https://claude.dev/blog/automating-eval-design-and-hillclimbing/). Measure a baseline, change a skill, and compare the results. The goal is to build evaluations for every skill and improve both the skills and their evaluations over time.
+
+The current suite covers `catalog-grader`. The [catalog-grader eval](evals/catalog-grader/README.md) tests the skill against saved catalog facts and maintainer-approved expected results. Scorer tests run without model calls:
 
 ```bash
 node --test evals/*/*.test.mjs
