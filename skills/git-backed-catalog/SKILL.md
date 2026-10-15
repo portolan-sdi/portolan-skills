@@ -12,7 +12,7 @@ A git-backed catalog keeps its metadata in a repository and its data in object s
 This pattern is useful for three reasons:
 
 * **Rollback.** Git keeps every previous version of the catalog and the changes between them.
-* **A validation loop.** CI runs `rashid` on every pull request. Edit, validate, fix, and repeat until the checks pass. A scheduled run checks that the documented queries still work on the published data.
+* **A validation loop.** CI runs `rashid` on every pull request. Edit, validate, fix, and repeat until the checks pass. Scheduled checks run documented queries against published data.
 * **A contribution path.** Someone who finds a wrong license can open a pull request instead of hunting for a contact address.
 
 See the [git-backed catalogs guidance](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/git-backed-catalogs.md) for the background and tradeoffs. The specification is ground truth. `rashid` implements it.
@@ -21,7 +21,7 @@ Pick the mode that matches what the user asked for.
 
 ## Catalog navigation
 
-Apply the [navigation contract](../portolan-bootstrap/reference/catalog-navigation.md) when you create or maintain a catalog. Replace the template's root `vcs` and `issues` placeholders, then emit the full link set on every catalog and collection. Generate the README link block and each child's browser link from the same configuration. Keep these steps in the repository's generator and checks.
+Apply the [navigation contract](../portolan-bootstrap/reference/catalog-navigation.md) in the repository's generator and checks. Replace the template's root `vcs` and `issues` placeholders.
 
 ## Mode A: create a new git-backed catalog
 
@@ -56,11 +56,11 @@ These two guards stop you, and both are deliberate:
 
 ### Declare the current schema version
 
-The pinned template declares `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json` in `catalog/catalog.json` (PORTO-CORE-006). Every object in the tree declares the same URI (PORTO-CORE-009). A v0.1.1 catalog that carries an absolute `self` link fails validation, because v0.1.1 forbids that link and v0.2.0 recommends it (PORTO-CORE-081).
+The pinned template declares `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json` in `catalog/catalog.json`. See PORTO-CORE-006, PORTO-CORE-009, and PORTO-CORE-081 for schema and `self` link requirements.
 
 ### Raise the validator floor in the gate
 
-`tests/test_conformance.py` fails when `rashid` is absent or outside its version range. The template sets `MIN_VERSION = (0, 1, 8)` and `SPEC = "rashid>=0.1.8,<0.2.0"`. To use the pinned rashid 0.3.0, set `MIN_VERSION = (0, 3, 0)`, `MAX_VERSION = (0, 4, 0)`, and `SPEC = "rashid>=0.3.0,<0.4.0"`. Install the same version into a repository virtualenv, so the version the tests find is the version CI installs:
+To use the pinned rashid 0.3.0, update `tests/test_conformance.py`: set `MIN_VERSION = (0, 3, 0)`, `MAX_VERSION = (0, 4, 0)`, and `SPEC = "rashid>=0.3.0,<0.4.0"`. Install the same version locally and in CI:
 
 ```bash
 python3 -m venv .venv
@@ -99,21 +99,16 @@ A fresh clone in CI has the metadata and not the data, so asset hrefs do not res
 
 ### Test the documented queries and claims
 
-Write this check for every git-backed catalog, because the template does not include it.
+Add documentation checks. The template has none. Read query blocks directly from Markdown under `catalog/`, without keeping a second copy.
 
-The Markdown under `catalog/` gives readers queries and states facts about the data. The data can change after the docs are written. If the source renames a column, the docs become wrong although nobody edited the repository. A scheduled check finds the change before a reader does.
+* Run each query against published URLs. Fail on errors or empty results. Mark intentional empty results and incomplete query fragments before their fences.
+* For each data claim, include a check query beside it, such as in an HTML comment. Return rows that contradict the claim. Fail if any exist.
+* Run checks on pull requests, after uploads, and on a schedule suited to source updates.
+* On scheduled failure, open or update one issue. Close it when checks pass. Grant issue write permission only to that job.
 
-The docs are the only copy of each query. The check reads the queries from the docs and does not keep its own list. It must do these things:
+Choose the engine and setup for the data. See [phl-housing-demo](https://github.com/nlebovits/phl-housing-demo), which runs documented SQL with DuckDB after refreshes.
 
-* Run each query block as a reader would paste it, against the published URLs. A query against a local path tests nothing that a reader gets.
-* Fail when a block errors or returns no rows. An empty result usually means a renamed category or a filter that no longer matches. Mark a block whose empty result is correct, and a fragment that is not a full query, on the line before its fence.
-* Run each claim check. A claim about the data gets a check query next to it, such as in an HTML comment. The query returns the rows that break the claim, so no rows means the claim is true.
-* Run in CI on each pull request, on a schedule, and after each upload of data. Match the schedule to how often the source changes.
-* On a scheduled failure, open one issue or comment on the open one. Close it on the next pass. Give the write permission for issues only to the job that does this.
-
-Pick the engine, the setup, and the schedule to suit the data. [phl-housing-demo](https://github.com/nlebovits/phl-housing-demo) is a worked example: `tests/test_queries.py` runs the SQL blocks with DuckDB, and `.github/workflows/refresh.yml` runs them after each refresh.
-
-Do not quote a row count or a percentage from the data. It goes stale at the next update. Give the query that measures it.
+For row counts and percentages, provide a query instead of a value that can go stale.
 
 ## Mode B: maintain an existing catalog
 
@@ -126,13 +121,13 @@ python3 tools/publish.py             # dry run
 python3 tools/publish.py --confirm   # upload; needs AWS credentials
 ```
 
-These seven points matter:
+When maintaining a catalog:
 
 * **Publishing never deletes.** Removing a file from `catalog/` does not remove the object from the bucket. Delete the object separately when that is intended.
 * **`portolan push` and `tools/publish.py` do not interoperate.** `portolan push` tracks uploads in `versions.json`, a CLI artifact keyed on sha256. The template's `tools/publish.py` keeps no state and compares local size and MD5 against the bucket listing. Pick one per catalog and say which in the repository's `AGENTS.md`.
 * **Edit the generator, not generated output.** If the repository has a `tools/` pipeline, change the source of the generated catalog.
 * **Do not widen the conformance allow-list to make CI pass.** Adding a finding to `ACCEPTED` in `tests/test_conformance.py` hides a defect in the catalog. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
-* **A docs-check issue means the data and the docs disagree.** Find out which one changed. Fix the doc, or fix the data if the change was a mistake. Do not delete a check or mark it as skipped to make the run pass.
+* **Investigate documentation check failures.** Correct the docs or unintended data changes. Do not delete or skip checks to make a run pass.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing omits `Content-Type`, so change detection does not notice.
 * **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 

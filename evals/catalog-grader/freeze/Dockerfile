@@ -1,5 +1,4 @@
-# Throwaway environment for collect_facts.py. The script runs code from
-# third-party catalogs, so it runs here and not on the host.
+# Isolate code from third-party catalog documentation.
 FROM python:3.12-slim
 
 RUN apt-get update \

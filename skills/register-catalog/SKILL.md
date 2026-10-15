@@ -22,7 +22,7 @@ CI extracts everything else by crawling the catalog: title, description, bbox, l
 
 ## Step 1: Validate the catalog
 
-The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Check the local tree first, then check the published URL before registration. `rashid check` accepts a local path or the HTTPS URL of a published catalog.
+The URL must end in `catalog.json` and point to a reachable Portolan catalog root. Before registration, run `rashid check` on the local tree, then the published HTTPS URL.
 
 ```bash
 uvx --from 'rashid>=0.3.0,<0.4.0' rashid check ./catalog --summary
@@ -111,7 +111,7 @@ The title is in conventional-commit form because squash-merge makes it the commi
 
 ## Step 5: Report
 
-Give the user the PR URL. The `Validate Catalogs` workflow mirrors new catalog metadata and runs rashid and stac-node-validator. Changes to current entries require a maintainer approval of the head commit. A PR that only adds new entries merges on its own when that workflow passes. After the merge, `publish.yml` opens a bot PR that updates `exports/catalogs.json`.
+Give the user the PR URL. `Validate Catalogs` mirrors new catalog metadata and runs rashid and stac-node-validator. PRs that only add entries merge when it passes. Changes to existing entries require maintainer approval of the head commit. After merging, `publish.yml` opens a bot PR to update `exports/catalogs.json`.
 
 ## Alternative: web submission
 

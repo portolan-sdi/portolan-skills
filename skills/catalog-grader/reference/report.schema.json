@@ -26,14 +26,14 @@
     },
     "catalog": {
       "type": "string",
-      "description": "The root catalog.json URL or directory that was graded."
+      "description": "Graded root catalog.json URL or directory."
     },
     "repo": {
       "type": [
         "string",
         "null"
       ],
-      "description": "The repository path, or null when none was given."
+      "description": "Repository path, or null if unavailable."
     },
     "grade": {
       "enum": [
@@ -47,7 +47,7 @@
     },
     "complete": {
       "type": "boolean",
-      "description": "False when a fact the rubric needs could not be collected."
+      "description": "False if required facts are unavailable."
     },
     "incomplete_reasons": {
       "type": "array",
@@ -79,7 +79,7 @@
     "invented_claims": {
       "type": "integer",
       "minimum": 0,
-      "description": "The count of findings with severity invented."
+      "description": "Number of findings with severity invented."
     },
     "areas": {
       "type": "object",
@@ -201,7 +201,7 @@
       "items": {
         "type": "string"
       },
-      "description": "One line per rubric step, in order, with the grade after the step."
+      "description": "Grade after each rubric step, in order."
     },
     "findings": {
       "type": "array",
@@ -309,11 +309,11 @@
       "properties": {
         "node": {
           "type": "string",
-          "description": "The node path from facts.json, or \".\" for the root."
+          "description": "Node path in facts.json; \".\" for the root."
         },
         "file": {
           "type": "string",
-          "description": "A path relative to the facts directory (docs/..., thumbnails/...), or a URL."
+          "description": "URL or path relative to the facts directory."
         },
         "line": {
           "type": [
@@ -360,7 +360,7 @@
             "major",
             "minor"
           ],
-          "description": "invented counts toward the honesty cap. major moves an area toward D. minor moves it toward B."
+          "description": "invented: honesty cap; major: area toward D; minor: area toward B."
         },
         "kind": {
           "enum": [
@@ -386,14 +386,14 @@
             "string",
             "null"
           ],
-          "description": "Text copied exactly from the file at where.file. null only when the finding is about something absent."
+          "description": "Exact quote from where.file; null only for absent content."
         },
         "fact": {
           "type": [
             "string",
             "null"
           ],
-          "description": "A JSON pointer into facts.json that supports the finding, such as /nodes/3/legend_checks/0."
+          "description": "Supporting JSON pointer into facts.json, such as /nodes/3/legend_checks/0."
         },
         "evidence": {
           "type": "string",

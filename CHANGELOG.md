@@ -7,47 +7,17 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- `git-backed-catalog` tells the agent to add a check that runs every query and
-  claim check in the catalog docs against the published data. The check runs on
-  each pull request, on a schedule, and after each upload. A failed scheduled
-  run opens one tracking issue (#33).
-- `catalog-grader` grades a published catalog from A+ to F on what rashid
-  cannot check: honesty, documentation, access, visuals, organization,
-  maintenance, and concision. `scripts/collect_facts.py` measures the
-  checkable facts, such as the rashid result, link status, thumbnail pixels,
-  legend labels against the data, the PMTiles zoom range, the result of each
-  SQL and Python block in the documents, document similarity, and the
-  repository's CI.
-  The grader judges the rest, and every finding quotes its evidence. One
-  invented claim caps the grade at C, two or more at D. A needs a git
-  repository whose CI runs rashid on pull requests and runs the documented
-  code and claim checks on a schedule, a logo, and registration in the
-  registry. `reference/report.schema.json` defines the JSON report, so evals
-  can score it.
-- `reference/rubric.md` replaces `specs/best-practices/grader.md`, which
-  leaves the specification.
-- `evals/catalog-grader/` is an eval for the `catalog-grader` skill. It holds
-  25 registered and local catalogs and, for the confirmed ones, an expected
-  grade band and the findings a correct report must state. `run-eval.mjs`
-  runs headless Claude Code on each case and `grade.mjs` scores the report.
-  A report passes when it validates, the grade rules apply, every quote is
-  exact, it read enough collections, and the grade is in the band.
-- `evals/_lib/frozen.sh` packs and fetches the frozen inputs of an eval. Each
-  version is a release tarball that `frozen.lock` names by checksum.
-- The `Evals` workflow tests the eval scorers on each pull request. The
-  `Eval catalog-grader` workflow runs the eval when a maintainer starts it.
+- `git-backed-catalog` adds CI checks for documented queries and claims (#33).
+- [`catalog-grader`](skills/catalog-grader/SKILL.md) grades catalog quality
+  with evidence. Its [rubric](skills/catalog-grader/reference/rubric.md)
+  replaces the specification's grader page.
+- [Catalog-grader eval](evals/catalog-grader/README.md), with frozen inputs,
+  scorer tests on pull requests, and a manually triggered eval workflow.
 
 ### Fixed
 
-- `collect_facts.py` reads the registry export as a STAC catalog, so a
-  registered catalog no longer reports as unregistered.
-- `collect_facts.py` resolves relative paths in a bare `FROM 'file'` or
-  `JOIN 'file'`, and runs a failed SQL block again after the setup
-  statements of the earlier blocks.
-- `collect_facts.py` installs `pyarrow`, `fsspec`, and `aiohttp` for blocks
-  that use pandas or geopandas, and reports a missing module as an
-  environment error.
-- `collect_facts.py --rashid-timeout` sets the rashid limit on its own.
+- Fact collection handles registry links, relative SQL paths, earlier SQL
+  setup, Python dependencies, and a separate rashid timeout.
 
 ### Changed
 

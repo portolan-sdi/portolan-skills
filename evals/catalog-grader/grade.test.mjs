@@ -1,5 +1,4 @@
-// Tests for the programmatic checks in grade.mjs. No model calls.
-// Run: node --test evals/
+// Test grade.mjs without model calls.
 
 import assert from 'node:assert/strict';
 import { test } from 'node:test';

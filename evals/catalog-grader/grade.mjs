@@ -1,8 +1,4 @@
-// Scoring for the catalog-grader eval. run-eval.mjs calls gradeReport() on
-// each report; grade.test.mjs tests the programmatic checks without a model.
-//
-// Every check here is programmatic except judge(), which asks a second model
-// to match the gold key findings and to test the report's invented findings.
+// Catalog-grader checks, plus a model judge for findings and evidence.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -15,11 +11,7 @@ const SCHEMA = resolve(HERE, '..', '..', 'skills', 'catalog-grader', 'reference'
 export const GRADE_ORDER = ['F', 'D', 'C', 'B', 'A', 'A+'];
 export const rank = g => GRADE_ORDER.indexOf(g);
 
-// Environment for a headless `claude -p`. CLAUDE_CONFIG_DIR points at a clean
-// directory, so no user CLAUDE.md, hooks, plugins, memory, or output style
-// reach the session. Auth comes from ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN,
-// or the credentials file that run-eval.mjs links into that directory.
-// Variables that would change the model are removed.
+// Use a clean config and remove model overrides; retain credentials.
 export function claudeEnv(configDir) {
   const env = { ...process.env, CLAUDE_CONFIG_DIR: configDir };
   for (const k of Object.keys(env)) {
@@ -67,8 +59,7 @@ print(json.dumps([f"{'/'.join(map(str,e.path))}: {e.message[:160]}" for e in err
   return JSON.parse(r.stdout);
 }
 
-// Recompute "Compute the grade" (rubric.md) from the report's own fields and
-// the frozen facts. Returns the list of rule violations.
+// Check rubric.md's "Compute the grade" against report fields and frozen facts.
 export function ruleViolations(rep, facts, hasRepo) {
   const v = [];
   const areas = Object.values(rep.areas ?? {}).map(a => a?.grade).filter(Boolean);
@@ -104,11 +95,9 @@ export function ruleViolations(rep, facts, hasRepo) {
   return v;
 }
 
-// SKILL.md Step 3: read every collection when there are up to 12, else at
-// least 12. Entries may be full paths or bare ids, and may name catalogs too,
-// so count only entries that match a crawled collection. The rule to also
-// read every flagged collection is not checked: one template defect can flag
-// most of a large catalog.
+// Check Step 3's minimum sample by collection path or unique leaf ID.
+// Flagged-collection coverage is unchecked: template defects can flag most
+// collections in a large catalog.
 export function coverage(rep, facts) {
   const paths = (facts.nodes ?? []).filter(n => n.type === 'Collection').map(n => n.path);
   const byLeaf = new Map();
@@ -166,8 +155,7 @@ export async function judge(input, rep, docs, facts, { env, model }) {
   const invented = (rep.findings ?? []).filter(f => f.severity === 'invented');
   if (!keys.length && !invented.length) return { key_findings: [], invented: [], usage: null };
   const findings = (rep.findings ?? []).map(({ id, area, severity, kind, where, quote, evidence }) => ({ id, area, severity, kind, where, quote, evidence }));
-  // A report states some problems outside findings: unmet A requirements, the
-  // ceiling, and why it is incomplete. The judge reads those too.
+  // Include problems recorded outside findings.
   const stated = { grade: rep.grade, ceiling: rep.ceiling, complete: rep.complete, incomplete_reasons: rep.incomplete_reasons,
                    a_requirements: rep.a_requirements, findings };
   const prompt = [

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Freeze the facts for one case. Runs inside the container.
+# Freeze one case inside the container.
 # Usage: freeze-case ID URL REPO_URL|- LOCAL_PATH|-
 # /skill is the catalog-grader skill (read-only). /out is the case directory.
 set -euo pipefail
@@ -22,6 +22,6 @@ uv run --quiet /skill/scripts/collect_facts.py "$target" \
   --out /out --rashid-timeout "${RASHID_TIMEOUT:-3600}" "${args[@]}" \
   > /out/collect.log 2>&1 || echo "collect_facts exit $?" >> /out/collect.log
 
-# The scratch directories hold the doc code's side effects. Drop them.
+# Discard side effects from documentation code.
 rm -rf /out/work
 date -u +%FT%TZ > /out/frozen-at.txt

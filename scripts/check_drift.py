@@ -586,7 +586,7 @@ def load_ptl_ids() -> set[str] | None:
 
 
 def check_cli_isolated(root: Path, version: str) -> list[Finding]:
-    """Check the CLI in its own environment, with its supported rashid."""
+    """Check the CLI with compatible dependencies."""
     result = subprocess.run([
         "uv", "run", "--quiet", "--with", f"portolan-cli=={version}",
         "--script", str(Path(__file__).resolve()), "--no-bootstrap",
@@ -685,12 +685,9 @@ def run(root: Path, offline: bool, mode: str) -> int:
 
 
 def bootstrap(root: Path, argv: list[str]) -> None:
-    """Re-run under `uv run --with` so the pinned rashid imports.
+    """Re-run with the pinned rashid if absent.
 
-    `uv run scripts/check_drift.py` resolves only the inline dependencies.
-    When rashid is absent, re-execute with its pins.toml version added.
-    The CLI runs in a separate environment because its rashid constraint
-    can exclude the validator pin. The environment flag stops a second hop.
+    Check the CLI separately because its dependencies can exclude that pin.
     """
     if os.environ.get("CHECK_DRIFT_BOOTSTRAPPED") or shutil.which("uv") is None:
         return

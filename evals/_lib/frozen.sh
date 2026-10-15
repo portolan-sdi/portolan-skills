@@ -1,16 +1,7 @@
 #!/usr/bin/env bash
-# Pack or fetch the frozen inputs of one skill eval.
-#
-# The frozen inputs (facts, saved docs, thumbnails) are too large for git. Each
-# version is a tarball attached to a GitHub release of this repository. The
-# eval directory commits frozen.lock, which names the release and the
-# tarball's sha256, so every run grades the same bytes.
-#
+# Pack or fetch frozen eval inputs; see evals/README.md for publishing.
 #   evals/_lib/frozen.sh fetch evals/catalog-grader
 #   evals/_lib/frozen.sh pack  evals/catalog-grader 2
-#
-# pack writes dist/<skill>-frozen-v<N>.tar.gz and frozen.lock. A maintainer
-# then creates the release that frozen.lock names and uploads the tarball.
 set -euo pipefail
 
 REPO_URL=https://github.com/portolan-sdi/portolan-skills
@@ -25,15 +16,12 @@ pack)
   tag="evals-$skill-frozen-v$version"
   asset="$skill-frozen-v$version.tar.gz"
   mkdir -p "$eval_dir/dist"
-  # The frozen inputs are copies of other publishers' documents and images.
-  # NOTICE.md names the source, license, and licensor of each case.
   python3 - "$eval_dir" > "$eval_dir/cases/NOTICE.md" <<'NOTICE'
 import collections, json, pathlib, sys
 eval_dir = pathlib.Path(sys.argv[1])
 print("# Frozen inputs: sources and licenses\n")
-print("Each directory under `cases/` holds copies of one published catalog's metadata, documents, and images,")
-print("saved for the eval. The copies keep the license of their source. The Apache-2.0 license of")
-print("portolan-skills does not apply to them. Use each case under the terms its publisher states below.\n")
+print("Frozen metadata, documents, and images retain their publishers' licenses, listed below.")
+print("The portolan-skills Apache-2.0 license does not apply to these copies.\n")
 print("| Case | Catalog | License | License page | Licensor |")
 print("|---|---|---|---|---|")
 for facts in sorted(eval_dir.glob("cases/*/frozen/facts.json")):

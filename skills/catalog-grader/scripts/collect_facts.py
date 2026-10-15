@@ -3,23 +3,10 @@
 # requires-python = ">=3.11"
 # dependencies = ["duckdb>=1.2", "pillow>=10", "pyyaml>=6"]
 # ///
-"""Collect the checkable facts about one Portolan catalog, for the grader.
+"""Collect catalog facts and save source documents and images.
 
-Everything here is measured, never judged. The grader reads facts.json and
-grades the parts that need judgment. Run it once per catalog:
-
-    uv run collect_facts.py CATALOG --out DIR [--repo PATH]
-
-CATALOG is the published root `catalog.json` URL, or a local catalog
-directory (for fixtures and evals). `--repo` is the git checkout the catalog
-is built from. The script writes DIR/facts.json plus copies of every
-README.md, AGENTS.md, thumbnail, and icon under DIR, so the grader reads the
-same bytes the facts describe.
-
-The script runs the SQL and Python blocks in the documentation, plus the
-shell blocks with --run-shell, each in its own process and its own scratch
-directory under DIR/work. That code comes from the catalog, so run the
-script on a machine you can throw away, such as a CI runner.
+Runs catalog SQL and Python; --run-shell also runs shell blocks.
+Use a disposable environment, such as a CI runner.
 """
 
 from __future__ import annotations
@@ -54,11 +41,10 @@ READ_FN_RE = re.compile(
     r"\b(read_parquet|parquet_scan|read_csv|read_csv_auto|read_json|read_json_auto|st_read|parquet_metadata|parquet_file_metadata)\s*\(\s*'([^']+)'",
     re.IGNORECASE,
 )
-# DuckDB also reads a quoted file path in FROM or JOIN directly (a replacement scan).
+# DuckDB also accepts quoted paths in FROM and JOIN.
 SCAN_RE = re.compile(r"\b(FROM|JOIN)\s+'([^']+)'", re.IGNORECASE)
 SQL_LANGS = {"sql", "duckdb"}
-# A claim check is a query in an HTML comment that returns the rows that
-# break the claim (see the git-backed-catalog skill). No rows means true.
+# Claim queries return rows that disprove the claim.
 CLAIM_SQL_RE = re.compile(r"\b(SELECT|WITH)\b", re.IGNORECASE)
 
 
@@ -79,7 +65,6 @@ def is_url(ref: str) -> bool:
 
 
 def resolve(base: str, href: str) -> str:
-    """Resolve href against the location of the document at base."""
     if is_url(href) or href.startswith(("s3://", "gs://", "mailto:")):
         return href
     if is_url(base):
@@ -107,7 +92,7 @@ def fetch(ref: str, timeout: float = 30, limit: int | None = None) -> Fetched:
 
 
 def fetch_head_bytes(ref: str, n: int, timeout: float = 30) -> Fetched:
-    """The first n bytes, by a range request for a URL."""
+    """Fetch the first n bytes; use a range request for URLs."""
     if not is_url(ref):
         return fetch(ref, timeout, limit=n)
     req = urllib.request.Request(ref, headers={"User-Agent": USER_AGENT, "Range": f"bytes=0-{n - 1}"})
@@ -139,7 +124,7 @@ def pmtiles_header(data: bytes) -> dict | None:
 
 
 def full_extent_zoom(bbox: list[float], width: int = 1024, height: int = 768) -> int | None:
-    """The highest zoom at which bbox fits a width x height map of 512-pixel tiles."""
+    """Find the highest zoom that fits bbox, using 512-pixel tiles."""
     import math
 
     if len(bbox) < 4:
@@ -202,7 +187,7 @@ class CodeBlock:
     lang: str
     line: int
     code: str
-    after: str  # the prose line that follows the fence, often the expected result
+    after: str  # First prose line after the fence.
 
 
 def parse_markdown(text: str) -> dict:
@@ -226,8 +211,7 @@ def parse_markdown(text: str) -> dict:
             i += 1
             continue
         if "<!--" in lines[i]:
-            # An HTML comment is not prose. Keep it apart, since a claim
-            # check query can live in one.
+            # Keep claim queries separate from prose.
             start, joined = i + 1, lines[i]
             while "-->" not in joined[joined.index("<!--") :] and i + 1 < len(lines):
                 i += 1
@@ -263,11 +247,7 @@ def parse_markdown(text: str) -> dict:
 
 
 def numeric_claims(prose: list[tuple[int, str]], limit: int = 60) -> list[dict]:
-    """Numbers stated in prose, with their sentence, for the grader to verify.
-
-    Years, list markers, and version-like tokens are left out. The grader
-    decides which of these are claims and checks each one.
-    """
+    """Extract prose numbers, excluding years and list markers."""
     out: list[dict] = []
     for line_no, text in prose:
         if HEADING_RE.match(text):
@@ -301,7 +281,7 @@ def image_facts(data: bytes) -> dict:
         return {"decodes": False, "error": str(exc)}
     width, height = img.size
     rgb = img.convert("RGBA")
-    # Composite transparency over white, the way a browser card shows it.
+    # Composite transparency over white.
     flat = Image.new("RGB", rgb.size, (255, 255, 255))
     flat.paste(rgb, mask=rgb.split()[3])
     small = flat.resize((64, 64))
@@ -342,7 +322,7 @@ def walk_expressions(node, found: list) -> None:
 
 
 def get_column(expr) -> str | None:
-    """The column a `["get", col]` input reads, also through to-string and the like."""
+    """Find a column reference in a nested style expression."""
     if isinstance(expr, list) and expr:
         if expr[0] == "get" and len(expr) >= 2 and isinstance(expr[1], str):
             return expr[1]
@@ -417,19 +397,15 @@ out["seconds"] = round(time.time() - t0, 2)
 print(json.dumps(out))
 """
 
-# A failure to fetch an extension or a package is the grader's environment,
-# not the catalog. The grader must not count it against the docs.
+# Dependency failures belong to the grader's environment.
 ENV_ERROR_RE = re.compile(
     r"Failed to (download|install)[^\n]*extension|extension[^\n]*could not be (downloaded|installed)"
     r"|No solution found when resolving|Failed to (fetch|download)[^\n]*(pypi|files\.pythonhosted)"
     r"|uv: command not found"
-    # The script installs the packages a block imports. A module the block uses
-    # without importing it (numpy behind DuckDB's .df(), pyarrow behind pandas)
-    # is missing from the grader's environment, not from the catalog.
+    # Include dependencies used without explicit imports.
     r"|ModuleNotFoundError: No module named|Use pip or conda to install",
     re.IGNORECASE,
 )
-# A relative path that does not resolve: a docs defect of its own kind.
 MISSING_FILE_RE = re.compile(r"FileNotFoundError|No such file or directory|No files found that match the pattern", re.IGNORECASE)
 
 # Import names whose PyPI package has another name.
@@ -441,12 +417,7 @@ IMPORT_PACKAGES = {
 
 
 def work_dir(doc_ref: str, local_root: str | None) -> str:
-    """A fresh directory to run one block in.
-
-    For a local catalog it links the files beside the document, so a
-    relative path reads what a reader of the published copy would read,
-    while anything the block writes stays out of the catalog.
-    """
+    """Create a scratch directory with links to local catalog files."""
     import tempfile
 
     base = OUT_DIR / "work"
@@ -469,12 +440,7 @@ def classify(out: dict, text: str) -> dict:
 
 
 def prepare_sql(code: str, doc_ref: str) -> tuple[str, list[str]]:
-    """Resolve relative paths in read functions against a published document's URL.
-
-    A reader who pastes the query runs it from their own directory, so a
-    relative path in published docs is a defect. The grader still learns
-    whether the query works, and the report says the path was resolved.
-    """
+    """Resolve and record relative SQL paths against a published document URL."""
     rewritten: list[str] = []
     if not is_url(doc_ref):
         return code, rewritten
@@ -511,7 +477,7 @@ def run_sql(code: str, doc_ref: str, local_root: str | None, timeout: int, max_r
 
 
 def python_packages(code: str) -> list[str]:
-    """The PyPI packages a block imports, leaving out the standard library."""
+    """Infer PyPI packages from imports."""
     import ast
 
     names: set[str] = set()
@@ -525,15 +491,14 @@ def python_packages(code: str) -> list[str]:
         names.update(re.findall(r"^\s*(?:from|import)\s+([A-Za-z_]\w*)", code, re.M))
     std = set(sys.stdlib_module_names)
     packages = {IMPORT_PACKAGES.get(n, n.replace("_", "-")) for n in names if n not in std}
-    # pandas and geopandas read Parquet through pyarrow, which a reader installs but rarely imports.
-    # They open URLs through fsspec, whose HTTP filesystem needs aiohttp.
+    # Include Parquet and HTTP dependencies that pandas loads indirectly.
     if packages & {"pandas", "geopandas"}:
         packages |= {"pyarrow", "fsspec", "aiohttp"}
     return sorted(packages)
 
 
 def strip_magics(code: str) -> tuple[str, list[str]]:
-    """Drop notebook lines (`!pip install`, `%matplotlib`) that plain Python rejects."""
+    """Remove notebook commands that Python rejects."""
     kept, dropped = [], []
     for line in code.splitlines():
         (dropped if line.lstrip().startswith(("!", "%")) else kept).append(line)
@@ -737,7 +702,6 @@ def collection_facts(crawl: Crawl, node: dict, obj: dict, ref: str) -> None:
     node["table_row_count"] = obj.get("table:row_count")
     node["partition_glob"] = obj.get("partition:glob")
 
-    # Thumbnail
     thumb_key = next((k for k, a in assets.items() if "thumbnail" in (a.get("roles") or [])), None)
     if thumb_key:
         target = resolve(ref, assets[thumb_key]["href"])
@@ -753,7 +717,6 @@ def collection_facts(crawl: Crawl, node: dict, obj: dict, ref: str) -> None:
     else:
         node["thumbnail"] = None
 
-    # Styles
     styles = []
     for k, a in assets.items():
         roles = a.get("roles") or []
@@ -769,7 +732,7 @@ def collection_facts(crawl: Crawl, node: dict, obj: dict, ref: str) -> None:
         styles.append(entry)
     node["styles"] = styles
 
-    # PMTiles header: does the first view at full extent have tiles?
+    # Check tile availability at full extent.
     pm = next((l for l in obj.get("links") or [] if l.get("rel") == "pmtiles" and l.get("href")), None)
     if pm:
         target = resolve(ref, pm["href"])
@@ -788,7 +751,6 @@ def collection_facts(crawl: Crawl, node: dict, obj: dict, ref: str) -> None:
     else:
         node["pmtiles"] = None
 
-    # Data asset: row count and the legend check
     data = data_source(obj, ref)
     node["data_source"] = data
     if data:
@@ -815,7 +777,7 @@ def data_source(obj: dict, ref: str) -> str | None:
 
 
 def legend_checks(crawl: Crawl, styles: list[dict], data: str, ref: str) -> list[dict]:
-    """Compare every `match` label with the values the column holds."""
+    """Compare style labels with column values."""
     out: list[dict] = []
     for style in styles:
         for col, labels in (style.get("match_labels") or {}).items():
@@ -899,8 +861,7 @@ def repo_facts(repo: Path, root_vcs: str | None) -> dict:
     facts["tests_mention_rashid"] = any(
         "rashid" in (repo / t).read_text(encoding="utf-8", errors="replace") for t in facts["tests"] if t.endswith(".py")
     )
-    # A test that reads the Markdown and runs its SQL is the docs check the
-    # git-backed-catalog skill asks for. The grader confirms by reading it.
+    # Find candidate docs tests for the grader to inspect.
     facts["tests_run_doc_queries"] = sorted(
         t for t in facts["tests"]
         if t.endswith(".py")
@@ -925,7 +886,7 @@ def repo_facts(repo: Path, root_vcs: str | None) -> dict:
 
 
 def similarity(nodes: list[dict], kind: str, limit: int = 60) -> list[dict]:
-    """Pairs of collections whose docs are near copies of each other."""
+    """Find collections with similar docs."""
     docs = []
     for n in nodes:
         doc = n.get(kind)
@@ -953,11 +914,7 @@ def similarity(nodes: list[dict], kind: str, limit: int = 60) -> list[dict]:
 
 
 def registry_urls(data: bytes) -> set[str]:
-    """Catalog URLs in the registry export.
-
-    The export is a STAC catalog that links each registered catalog as a
-    child. Older exports listed entries with a "url" field, so read both.
-    """
+    """Read catalog URLs from current and legacy registry exports."""
     doc = json.loads(data)
     urls = {link["href"] for link in doc.get("links", []) if link.get("rel") == "child" and link.get("href")}
     urls |= set(re.findall(r'"url"\s*:\s*"([^"]+)"', data.decode("utf-8", "replace")))
@@ -1015,19 +972,15 @@ SQL_SETUP_RE = re.compile(r"^\s*(INSTALL|LOAD|SET|CREATE\s+(OR\s+REPLACE\s+)?(PE
 
 
 def sql_setup_statements(code: str) -> list[str]:
-    """The statements in a SQL block that change the session: extensions, settings, secrets."""
+    """Extract SQL setup statements."""
     text = "\n".join(re.sub(r"--.*$", "", line) for line in code.splitlines())
     return [stmt.strip() + ";" for stmt in text.split(";") if SQL_SETUP_RE.match(stmt)]
 
 
 def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> list[dict]:
-    """Run the SQL and Python blocks in the docs, and the shell blocks when asked.
+    """Run SQL and Python blocks, plus shell blocks when enabled.
 
-    Docs often split one program across blocks, as a notebook does. A Python
-    block that fails on an undefined name runs again after the earlier
-    Python blocks of the same document. A SQL block that fails runs again
-    after the setup statements (INSTALL, LOAD, SET, CREATE SECRET) of the
-    earlier SQL blocks, and the second result is kept only when it succeeds.
+    Retry failed blocks with earlier Python blocks or SQL setup statements.
     """
     results: list[dict] = []
     for n in crawl.nodes:
@@ -1074,7 +1027,7 @@ def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> li
 
 
 def run_claim_checks(crawl: Crawl, max_blocks: int, timeout: int) -> list[dict]:
-    """Run each claim check. A check that returns rows means the claim is false."""
+    """Run claim queries; returned rows disprove the claim."""
     results = []
     for n in crawl.nodes:
         for kind in ("README.md", "AGENTS.md"):
@@ -1095,21 +1048,21 @@ OUT_DIR = Path(".")
 def main(argv: list[str] | None = None) -> int:
     global OUT_DIR
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("catalog", help="published root catalog.json URL, or a local catalog directory")
-    ap.add_argument("--out", required=True, type=Path, help="directory for facts.json and the saved files")
-    ap.add_argument("--repo", type=Path, help="git checkout the catalog is built from")
+    ap.add_argument("catalog", help="root catalog.json URL or local catalog directory")
+    ap.add_argument("--out", required=True, type=Path, help="directory for facts.json and source files")
+    ap.add_argument("--repo", type=Path, help="catalog source checkout")
     ap.add_argument("--rashid", default=None, help="command that runs rashid (default: rashid on PATH, else uvx rashid)")
-    ap.add_argument("--no-rashid", action="store_true", help="skip the rashid run")
+    ap.add_argument("--no-rashid", action="store_true", help="skip rashid")
     ap.add_argument("--rashid-data", action="store_true", help="let rashid read every asset (slow on large catalogs)")
-    ap.add_argument("--no-code", action="store_true", help="do not run the code in the documentation")
-    ap.add_argument("--run-shell", action="store_true", help="also run the shell blocks in the documentation")
-    ap.add_argument("--registry-submission", action="store_true", help="the catalog is being submitted to the registry, so it cannot be registered yet")
-    ap.add_argument("--no-links", action="store_true", help="do not probe links")
-    ap.add_argument("--no-registry", action="store_true", help="do not look the catalog up in the registry")
-    ap.add_argument("--max-blocks", type=int, default=80, help="code blocks and claim checks to run, each")
+    ap.add_argument("--no-code", action="store_true", help="skip documentation code")
+    ap.add_argument("--run-shell", action="store_true", help="also run shell blocks")
+    ap.add_argument("--registry-submission", action="store_true", help="mark as a registry submission and skip registration lookup")
+    ap.add_argument("--no-links", action="store_true", help="skip link checks")
+    ap.add_argument("--no-registry", action="store_true", help="skip registration lookup")
+    ap.add_argument("--max-blocks", type=int, default=80, help="limit for code blocks and for claim checks")
     ap.add_argument("--max-links", type=int, default=600)
     ap.add_argument("--max-nodes", type=int, default=400)
-    ap.add_argument("--timeout", type=int, default=120, help="seconds per query and per fetch")
+    ap.add_argument("--timeout", type=int, default=120, help="seconds per query or fetch")
     ap.add_argument("--rashid-timeout", type=int, default=None, help="seconds for the rashid run (default: 10 times --timeout)")
     args = ap.parse_args(argv)
 
@@ -1164,7 +1117,7 @@ def main(argv: list[str] | None = None) -> int:
         checked = targets[: args.max_links]
         with concurrent.futures.ThreadPoolExecutor(16) as pool:
             results = list(pool.map(probe, checked))
-            # A connection error or a server error gets one retry.
+            # Retry connection and server errors once.
             retry = [i for i, r in enumerate(results) if r.get("ok") is False and (r.get("status") is None or r["status"] >= 500)]
             for i, r in zip(retry, pool.map(probe, [results[i]["target"] for i in retry])):
                 results[i] = r
@@ -1179,14 +1132,11 @@ def main(argv: list[str] | None = None) -> int:
             "total": len(targets),
             "checked": len(checked),
             "ok_count": sum(1 for r in results if r.get("ok")),
-            # An HTTP error status, or a local file that does not exist.
             "broken": broken,
-            # 401, 403, 429: the host refused the grader. Often a bot block,
-            # so the link is unverified, not broken.
+            # A host refusal leaves the link unverified.
             "refused": refused,
-            # No HTTP answer at all: DNS, TLS, timeout, or a proxy refusal.
             "unreachable": unreachable,
-            # Most external links unanswered points at the grader's network.
+            # Widespread failures suggest a grader network problem.
             "network_suspect": bool(external) and len(unreachable) + len(refused) > 0.5 * len(external),
             "not_checked": [r for r in results if r.get("ok") is None],
         }
@@ -1243,7 +1193,7 @@ def main(argv: list[str] | None = None) -> int:
     (OUT_DIR / "facts.json").write_text(json.dumps(facts, indent=2, ensure_ascii=False))
     import shutil
 
-    shutil.rmtree(OUT_DIR / "work", ignore_errors=True)  # does not follow the links into the catalog
+    shutil.rmtree(OUT_DIR / "work", ignore_errors=True)  # Leaves symlink targets intact.
     print(f"wrote {OUT_DIR / 'facts.json'}")
     print(json.dumps(facts["summary"], indent=2))
     return 0

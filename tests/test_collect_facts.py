@@ -1,4 +1,4 @@
-"""skills/catalog-grader/scripts/collect_facts.py against a catalog built in tmp_path. No network."""
+"""Test catalog fact collection with local fixtures."""
 
 from __future__ import annotations
 
@@ -270,7 +270,7 @@ def test_main_on_fixture(facts_mod, catalog, tmp_path):
     assert py_use["ok"] is True and py_use["ran_after_earlier_blocks"] == 2
     assert py_use["stdout"].strip().endswith("42")
     assert copy["ok"] is True
-    # Code from the docs writes into a scratch directory, never the catalog.
+    # New output files stay in the scratch directory.
     assert not list(catalog.rglob("written-by-docs.csv"))
     assert not (out / "work").exists()
     # Shell blocks run only with --run-shell.
@@ -282,7 +282,7 @@ def test_main_on_fixture(facts_mod, catalog, tmp_path):
     assert roads["AGENTS.md"]["claim_check_count"] == 2
 
     assert facts["agents_similarity"][0]["ratio"] == 1.0
-    # The fixture's external links are placeholders. Their status depends on the network, so check local links only.
+    # External link status depends on the network.
     broken = {Path(b["target"]).name for b in facts["links"]["broken"] if not b["target"].startswith("http")}
     assert broken == {"missing-license.txt"}
     assert facts["summary"]["thumbnails_likely_blank"] == ["rivers"]

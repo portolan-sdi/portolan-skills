@@ -1,11 +1,7 @@
 #!/usr/bin/env python3
-"""Print a Markdown summary of one or more eval variants.
+"""Print eval metrics, cost, and per-case results as Markdown.
 
     python3 evals/catalog-grader/summary.py .claude/hillclimb/catalog-grader/baseline [.../v1 ...]
-
-For each variant it prints the pass rate with a 95% Wilson interval, the mean
-of every other metric, and the measured cost, then one row per case. Paste
-the output into the Verification section of a pull request.
 """
 
 from __future__ import annotations

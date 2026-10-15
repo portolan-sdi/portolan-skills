@@ -1,17 +1,11 @@
-# Local workflow. Runs the catalog-grader eval against the frozen inputs that
-# evals/catalog-grader/frozen.lock names. Each case is a full Claude Code
-# session, so a run costs money: a maintainer starts it by hand.
-#
-# It needs one repository secret: CLAUDE_CODE_OAUTH_TOKEN (from
-# `claude setup-token`) or ANTHROPIC_API_KEY. The report and the per-case
-# results are uploaded as an artifact.
+# Paid eval; requires CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY.
 name: Eval catalog-grader
 
 on:
   workflow_dispatch:
     inputs:
       model:
-        description: Model the skill runs on
+        description: Model to test
         default: claude-opus-5-5
       judge:
         description: Judge model (must differ from the model)
@@ -20,7 +14,7 @@ on:
         description: Repetitions per case
         default: "1"
       only:
-        description: Comma-separated case ids (empty runs every case)
+        description: Case IDs, comma-separated (empty runs all)
         default: ""
 
 permissions:
@@ -44,7 +38,6 @@ jobs:
           python-version: "3.12"
 
       - name: Install Claude Code
-        # An exact version, not a range. There is no lockfile for a global CLI.
         run: npm install -g @anthropic-ai/claude-code@2.1.300 # zizmor: ignore[adhoc-packages]
 
       - name: Fetch the frozen inputs

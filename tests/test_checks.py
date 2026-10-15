@@ -117,7 +117,6 @@ def test_end_to_end_fixture(drift, fixtures, fake_cli, monkeypatch):
 
 
 def test_isolated_cli_reports_findings(drift, tmp_path, monkeypatch):
-    """The subprocess preserves CLI diagnostics and installs only the CLI pin."""
     import json
     import subprocess
 
@@ -143,7 +142,6 @@ def test_isolated_cli_reports_findings(drift, tmp_path, monkeypatch):
 
 
 def test_isolated_cli_failure_blocks(drift, tmp_path, monkeypatch):
-    """An environment failure cannot turn the CLI checks into a clean run."""
     import subprocess
 
     monkeypatch.setattr(drift.subprocess, "run", lambda argv, **kwargs:

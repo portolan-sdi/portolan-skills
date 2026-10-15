@@ -1,50 +1,22 @@
 #!/usr/bin/env node
-// Copied unchanged from the claude-api skill in github.com/anthropics/skills
+// Adapted from the claude-api skill in github.com/anthropics/skills
 // (skills/claude-api/shared/evals/report), Apache-2.0, Copyright Anthropic.
-// Lite report builder for the build-eval / hillclimb loop: a single static
-// report.html with no vendored runtime, fonts, or markdown engine.
+// Build report.html and trajectory/scores.tsv from eval results.
 //
 //   node build-report-lite.mjs .claude/hillclimb/<flow>/
-//
-// Reads the same on-disk layout as build-report.mjs (baseline/, v<N>/,
-// results.jsonl, errors.jsonl, change.md, summary.json, traces/, _state.json)
-// and derives the same numbers: per-variant mean of the primary metric over
-// status-ok rows, per-case means, split (train/val/test) from _state.json,
-// failed-attempt counts from errors.jsonl. It also writes
-// trajectory/scores.tsv exactly as the full builder does, so hillclimb's
-// per-round bookkeeping is identical whichever builder ran.
-//
-// What it deliberately does not do: render markdown, inline transcripts or
-// attachments, or execute anything from the data. Every string from disk is
-// HTML-escaped; traces are linked by relative path, not embedded. Sorting is
-// a few lines of inline script over the rendered table only.
-//
-// Runs under node or bun. Node builtins only.
 
 import { closeSync, constants as FS, fstatSync, ftruncateSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 
 const isNum = x => typeof x === 'number' && Number.isFinite(x);
-// readText/readJSON refuse symlinks, like the full builder's lib/adapter.mjs:
-// the flow dir is model-influenced, and a prompt-injected agent could plant
-// `summary.json -> ~/.ssh/id_rsa`; the user later runs this builder (outside
-// any sandbox) and the target lands in the shareable report.html. Open
-// O_NOFOLLOW and fstat the fd (not lstat-then-read) so a concurrent writer
-// can't swap in a symlink between the check and the read.
-// O_NOFOLLOW is only trustworthy on POSIX: Node leaves it undefined on
-// Windows and Bun defines it there with a meaningless nonzero value that
-// makes every open fail, so the flag is applied by platform, and
-// Windows falls back to an lstat refusal - a check-then-use window, but the
-// alternative is no symlink check at all.
+// Refuse links in model-influenced paths. Windows lacks O_NOFOLLOW,
+// so its lstat fallback remains vulnerable to concurrent link swaps.
 const WIN = process.platform === 'win32';
 const NOFOLLOW = WIN ? 0 : FS.O_NOFOLLOW;
-// A guard that cannot tell must refuse: only "no such entry" reads as absent;
-// any other lstat failure (EACCES, ENAMETOOLONG, ...) is rethrown, never "no".
+// Only ENOENT means absent; other inspection failures must abort.
 const isSymlink = p => {
   try { return lstatSync(p).isSymbolicLink(); } catch (e) { if (e?.code === 'ENOENT') return false; throw e; }
 };
-// Files skipped for having a second hard link, so build() can say so as well
-// as reporting them as missing or empty.
 const skippedHardLinks = [];
 const readText = p => {
   let fd;
@@ -52,49 +24,30 @@ const readText = p => {
     if (WIN && isSymlink(p)) return '';
     fd = openSync(p, FS.O_RDONLY | NOFOLLOW);
     const st = fstatSync(fd);
-    // O_NOFOLLOW and lstat cannot see a hard link (a second name for a file
-    // outside the flow dir); nothing in a flow dir needs one, so read nothing.
+    // Hard links bypass symlink checks; eval outputs do not need them.
     if (!st.isFile()) return '';
     if (st.nlink > 1) { skippedHardLinks.push(p); return ''; }
     return readFileSync(fd, 'utf8');
   } catch { return ''; }
   finally { if (fd !== undefined) closeSync(fd); }
 };
-// Output writes get the same discipline as reads: the flow dir is
-// model-influenced, so `report.html -> ~/.bashrc` planted there must not be
-// followed. POSIX opens O_NOFOLLOW (a symlink fails with ELOOP); Windows
-// lstat-refuses first. A symlinked parent dir is refused the same way.
-// The immediate-parent lstat can't see a symlink higher up the path, so
-// writes are also bound to the flow root resolved ONCE at build entry
-// (resolveOutputRoot below).
-// Re-resolving the caller-named path here would self-anchor: root and
-// target would resolve through the same planted link and the check would
-// pass vacuously.
+// Compare against the root captured at entry. Resolving it again could
+// follow a replaced link and invalidate containment checks.
 function assertContained(dir, root) {
   if (root == null) throw new Error('refusing to write: output root not resolved');
   const dirReal = realpathSync(dir);
   if (dirReal !== root && !dirReal.startsWith(root + (WIN ? '\\' : '/')))
     throw new Error('refusing to write outside ' + root + ': ' + dir);
 }
-// Refuse a symlink at the flow path itself, then pin its resolution for the
-// whole build. Takes the path AS THE CALLER NAMED IT: a RELATIVE root is
-// lstat-walked component by component from the cwd first (a pre-planted
-// ancestor link would otherwise relocate the anchor itself), and a trailing
-// separator is stripped (lstat("link/") follows the final symlink).
-// Residual: an ancestor link above an ABSOLUTE root stays the caller's own
-// trust decision (it can be legitimate - macOS /tmp); a swap after entry
-// fails assertContained when the check sees it. Residual, all platforms: the
-// check and the open are separate path lookups (Node's sync fs has no
-// openat-style call), so a directory swapped for a symlink in between is
-// still followed. This stops a planted link, not a writer racing the build.
+// Check relative ancestors before capturing the root. Absolute paths may
+// have legitimate ancestor links, such as macOS /tmp. Separate checks and
+// opens cannot prevent concurrent directory swaps without an openat API.
 function resolveOutputRoot(root) {
-  // Only Windows treats `\` as a separator; on POSIX it is a filename byte, so
-  // splitting on it would walk prefixes that are not real path components.
+  // Trailing separators make lstat follow links. Backslash separates paths
+  // only on Windows.
   root = String(root).replace(WIN ? /(.)[\\/]+$/ : /(.)\/+$/, '$1');
   const segments = root.split(WIN ? /[\\/]/ : '/');
-  // A `.`/`..` segment (e.g. a trailing `/.`) makes the leaf lstat below
-  // follow a planted link at the flow root, and the absolute branch skips the
-  // ancestor walk. Refuse dot segments outright.
+  // Dot segments can bypass link checks at the flow root.
   if (segments.some(seg => seg === '.' || seg === '..'))
     throw new Error('refusing to write into ' + root + ": '.'/'..' path segment");
   if (!isAbsolute(root)) {
@@ -111,16 +64,14 @@ function writeNoFollow(p, data, root) {
   if (isSymlink(dirname(p))) throw new Error('refusing to write through symlinked directory: ' + dirname(p));
   assertContained(dirname(p), root);
   if (WIN && isSymlink(p)) throw new Error('refusing to write through symlink: ' + p);
-  // Opened without O_TRUNC and truncated only after the checks, so a refused
-  // file keeps its bytes.
+  // Check before truncating to preserve refused files.
   const fd = openSync(p, FS.O_WRONLY | FS.O_CREAT | NOFOLLOW, 0o644);
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error('refusing to write to non-regular file: ' + p);
     if (st.nlink > 1) throw new Error('refusing to write to ' + p + ': it has a second hard link (another name for the same file); replace it with a plain copy if it is yours');
     ftruncateSync(fd, 0);
-    // writeFileSync on the fd loops until every byte lands (a bare writeSync
-    // is one write(2) that may return short on ENOSPC and silently truncate).
+    // writeFileSync handles short writes.
     writeFileSync(fd, data);
   } finally { closeSync(fd); }
 }
@@ -131,10 +82,7 @@ function mkdirNoFollow(dir, root) {
   assertContained(dir, root);
 }
 const readJSON = (p, dflt) => { try { return JSON.parse(readText(p)); } catch { return dflt; } };
-// Warnings/errors interpolate model-influenced bytes (directory names,
-// JSON.parse messages). Strip escape sequences and control characters before
-// they reach the terminal, so a planted
-// OSC/CSI can't retitle the terminal or forge output lines.
+// Strip terminal controls from model-influenced output.
 const ESC_SEQ = /\x1b\[[0-?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]/g;
 const CONTROL = /[\x00-\x1f\x7f-\x9f]/g;
 const termSafe = s => String(s).replace(ESC_SEQ, '').replace(CONTROL, '');
@@ -142,17 +90,12 @@ const eprint = (...a) => console.error(...a.map(termSafe));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = x => (x == null ? '' : x.toFixed(3));
-// TSV id cells come from untrusted results.jsonl: strip the separators that
-// would forge rows/columns in trajectory/scores.tsv, and neutralize a leading
-// formula trigger so spreadsheet apps don't execute '=WEBSERVICE(...)' on
-// open. Mirrored in the full builder's lib/adapter.mjs so both emit
-// byte-identical scores.tsv.
+// Prevent untrusted TSV cells from adding rows or spreadsheet formulas.
 const tsvCell = s => {
   const flat = String(s).replace(/[\t\n\r]/g, ' ');
   return /^[=+\-@]/.test(flat) ? "'" + flat : flat;
 };
 
-// Variant directories: exactly `baseline` or `v<N>`, numeric order.
 function discoverVariants(flow) {
   const names = readdirSync(flow, { withFileTypes: true })
     .filter(e => e.isDirectory() && /^(baseline|v\d+)$/.test(e.name))
@@ -161,8 +104,6 @@ function discoverVariants(flow) {
   return names.sort((a, b) => rank(a) - rank(b));
 }
 
-// Mirrors the full adapter: an object of numeric/boolean grades, a bare
-// boolean, or a bare number (-> {score}).
 function coerceScores(g) {
   if (g && typeof g === 'object' && !Array.isArray(g)) {
     const out = {};
@@ -175,7 +116,7 @@ function coerceScores(g) {
 }
 
 function loadRows(p, warnings, dir) {
-  // Keyed by data-supplied ids: null-prototype so '__proto__' is a key, not a crash.
+  // A null prototype permits data keys such as __proto__.
   const byId = Object.create(null);
   readText(p).split('\n').forEach((line, i) => {
     line = line.trim();
@@ -202,9 +143,6 @@ function countErrors(vdir) {
   return { total, byClass };
 }
 
-// Inferred metrics, mirroring the full builder's inferMetrics: any
-// explanation for a key -> judge, all-0/1 values -> binary, else float;
-// first-seen order.
 function inferMetrics(rows, variants) {
   const seen = new Map();
   for (const v of variants) for (const reps of Object.values(rows[v])) for (const r of reps) {
@@ -222,14 +160,11 @@ function inferMetrics(rows, variants) {
 function build(flowArg) {
   const flow = resolve(flowArg);
   if (!statSync(flow, { throwIfNoEntry: false })?.isDirectory()) throw new Error('not a directory: ' + flow);
-  // Pinned from the path as the caller named it, so the relative-ancestor
-  // walk in resolveOutputRoot applies (resolve() would skip it).
+  // Preserve the caller's relative path for ancestor checks.
   const flowRoot = resolveOutputRoot(flowArg);
   const variants = discoverVariants(flow);
   if (!variants.length) throw new Error('no variant directories (baseline/, v1/, ...) under ' + flow);
   const warnings = [];
-  // Same warning the full builder gives: a mis-named variant dir is the usual
-  // reason the header shows one variant fewer than expected.
   const nonVariant = new Set(['trajectory', 'attachments', 'refs', 'ref', 'inputs', 'out', 'target', '__pycache__']);
   for (const e of readdirSync(flow, { withFileTypes: true }))
     if (e.isDirectory() && !variants.includes(e.name) && !nonVariant.has(e.name)
@@ -248,10 +183,7 @@ function build(flowArg) {
   const rows = Object.create(null);
   for (const v of variants) rows[v] = loadRows(join(flow, v, 'results.jsonl'), warnings, v);
 
-  // Trace links are emitted only for a real traces/ directory that resolves
-  // inside the pinned flow root: the per-file lstat below refuses a symlinked
-  // trace but silently resolves a symlinked traces/ (or variant) directory,
-  // which would link files from wherever it points into the report.
+  // Check trace directories too; per-file lstat follows ancestor links.
   const traceDirOk = Object.create(null);
   for (const v of variants) {
     const tdir = join(flow, v, 'traces');
@@ -266,10 +198,7 @@ function build(flowArg) {
     } catch { traceDirOk[v] = false; }
   }
 
-  // Same as the full builder: drop non-baseline variants with zero result
-  // rows (a vN/ holding only change.md while the run warms up would render a
-  // blank column), and refuse to build when the first variant itself has none
-  // rather than overwrite a good trajectory/scores.tsv with a header-only file.
+  // Skip empty variants and preserve existing scores when no results exist.
   for (let i = variants.length - 1; i > 0; i--) {
     const v = variants[i];
     if (Object.keys(rows[v]).length) continue;
@@ -285,18 +214,12 @@ function build(flowArg) {
     const vdir = join(flow, v);
     const change = readText(join(vdir, 'change.md')).split('\n').find(l => l.trim()) || '';
     const summary = readJSON(join(vdir, 'summary.json'), {}) || {};
-    // Model: summary.json wins, else the most common row.model (what the app called).
     const tally = Object.create(null);
     for (const reps of Object.values(rows[v])) for (const r of reps) if (typeof r.model === 'string') tally[r.model] = (tally[r.model] || 0) + 1;
     const rowModel = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] || '';
     header[v] = { change: change.replace(/^#+\s*/, ''), model: summary.model || rowModel, errors: countErrors(vdir) };
   }
 
-  // Metrics: _state.json `metrics` (or the legacy `criteria` key) wins,
-  // keeping each declared `kind`; else inferred from grade keys. Primary is
-  // the first declared-or-inferred binary metric, else the first - the same
-  // selection the full builder's lib/adapter.mjs makes, so both builders
-  // report the same metric's numbers on the same flow.
   const metricsCfg = state.metrics || state.criteria;
   const declared = (Array.isArray(metricsCfg) ? metricsCfg : [])
     .map(m => (typeof m === 'string' ? { id: m } : { id: m?.id, kind: m?.kind }))
@@ -305,7 +228,6 @@ function build(flowArg) {
   if (!metrics.length) metrics.push({ id: 'score', kind: 'float' });
   const primary = (metrics.find(m => m.kind === 'binary') || metrics[0]).id;
 
-  // Cases: union of ids across variants, in first-seen order.
   const ids = [];
   const seenId = new Set();
   for (const v of variants) for (const pid of Object.keys(rows[v])) if (!seenId.has(pid)) { seenId.add(pid); ids.push(pid); }
@@ -326,19 +248,8 @@ function build(flowArg) {
         reps: reps.length,
         truncated: reps.filter(r => r.status === 'truncated').length,
         traces: reps.map((r, k) => {
-          // Link only to files directly inside this variant's traces/ dir:
-          // ids and reps come from results.jsonl (data, not trusted), so the
-          // composed path must not resolve anywhere else, and a symlinked
-          // trace must not become a link out of the tree. Keep the rep
-          // number so the link label matches the file it points at even when
-          // earlier reps have no trace. For rep 0 also accept the flat
-          // traces/<id>.json a single-rep runner may write (the full builder
-          // reads it as rep 0 too).
-          // The href is resolved by a browser with URL semantics, not the
-          // filesystem's: allowlist the id to the scaffold's path-safe
-          // charset (so `#`, `?`, `\\`, `%` and separators never reach the
-          // link) and require an integer rep, on top of the traceDirOk
-          // resolved-path check above and the lexical one below.
+          // Untrusted IDs must be safe in browser URLs and file paths.
+          // Rep 0 also accepts traces/<id>.json for single-rep runners.
           if (!traceDirOk[v]) return null;
           const rep = r.rep ?? k;
           if (!/^[A-Za-z0-9_.-]+$/.test(pid) || /^\.+$/.test(pid)) return null;
@@ -348,7 +259,6 @@ function build(flowArg) {
             const rel = v + '/traces/' + stem + '.json';
             const abs = resolve(flow, rel);
             if (dirname(abs) !== join(flow, v, 'traces')) return null;
-            // A hard-linked trace is no more ours than a symlinked one.
             const ls = lstatSync(abs, { throwIfNoEntry: false });
             if (ls?.isFile() && !(ls.nlink > 1)) return { rep, rel };
           }
@@ -359,7 +269,6 @@ function build(flowArg) {
     return { id: pid, split: splitOf[pid] || '', tags, prompt: String(first.prompt ?? ''), per };
   });
 
-  // Per-variant aggregate: mean over cases that have a value, per split.
   const agg = {};
   for (const v of variants) {
     const all = cases.map(c => c.per[v].mean).filter(isNum);
@@ -369,15 +278,11 @@ function build(flowArg) {
       truncated: cases.reduce((s, c) => s + c.per[v].truncated, 0) };
   }
 
-  // trajectory/scores.tsv - same shape as the full builder.
   mkdirNoFollow(join(flow, 'trajectory'), flowRoot);
   const tsv = [['id', 'split', ...variants].join('\t')];
   for (const c of cases) tsv.push([tsvCell(c.id), tsvCell(c.split || 'all'), ...variants.map(v => fmt(c.per[v].mean))].join('\t'));
   writeNoFollow(join(flow, 'trajectory', 'scores.tsv'), tsv.join('\n') + '\n', flowRoot);
 
-  // _state.json's `best` is {round, test_score}; map the round to a variant
-  // name the way the full builder does (0 = baseline), and drop it when the
-  // named variant isn't on disk.
   let best = null;
   if (Number.isInteger(state.best?.round)) {
     best = state.best.round === 0 ? 'baseline' : 'v' + state.best.round;
@@ -437,12 +342,12 @@ function render({ flow, variants, header, agg, cases, primary, metrics, warnings
     + ' &middot; primary metric <code>' + esc(primary) + '</code>'
     + (metrics.length > 1 ? ' (also: ' + metrics.filter(m => m !== primary).map(esc).join(', ') + ')' : '')
     + ' &middot; generated ' + new Date().toISOString().slice(0, 19).replace('T', ' ') + ' UTC'
-    + ' &middot; lite report (no transcripts inlined; click rep links)</p></header>'
+    + ' &middot; transcripts: rep links</p></header>'
     + '<section><h2>Variants</h2><table><thead><tr>' + th('variant', 's') + th('change', 's') + th('model', 's')
     + th('mean ' + primary, 'n') + th('cases', 'n')
     + (hasTest ? th('test mean', 'n') + th('test cases', 'n') : '')
     + th('truncated', 'n') + th('failed attempts', 's') + '</tr></thead><tbody>' + variantRows + '</tbody></table></section>'
-    + '<section><h2>Cases</h2><p class="hint">Click a column header to sort. Per-case values are the mean of <code>' + esc(primary) + '</code> over status-ok reps.</p>'
+    + '<section><h2>Cases</h2><p class="hint">Click a column header to sort. Values average <code>' + esc(primary) + '</code> over repetitions with status <code>ok</code>.</p>'
     + '<table id="cases"><thead><tr>' + th('id', 's') + (hasSplit ? th('split', 's') : '') + th('tags', 's')
     + variants.map(v => th(v, 'n')).join('') + th('prompt', 's') + '</tr></thead><tbody>' + caseRows + '</tbody></table></section>'
     + warn

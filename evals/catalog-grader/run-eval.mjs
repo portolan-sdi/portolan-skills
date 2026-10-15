@@ -1,36 +1,7 @@
 #!/usr/bin/env node
-// Eval runner for the catalog-grader skill. The harness below the
-// "--- harness" line is the runner scaffold from the claude-api skill in
-// github.com/anthropics/skills (skills/claude-api/shared/evals/report),
-// Apache-2.0, Copyright Anthropic. The case and run functions are ours, and
-// the scoring is in grade.mjs.
-//
-//   node evals/catalog-grader/run-eval.mjs --flow .claude/hillclimb/catalog-grader \
-//     --variant baseline --model claude-opus-5-5 --reps 2 --concurrency 3
-//
-// CG_EVAL_ONLY=id1,id2 limits the run to those cases. CG_EVAL_EFFORT sets the
-// effort (default high). CG_EVAL_JUDGE sets the judge model (default Sonnet
-// 5.5). CG_EVAL_REGRADE_FROM re-scores a previous run's reports.
-//
-// Structural properties this encodes (so you don't have to remember them):
-//   - parameterized by --variant / --model / --reps (no hardcoded A/B pair)
-//   - rep-aware filenames + resume (traces/<id>_rep<k>.json)
-//   - reads _state.json, never writes it (loop state belongs to the orchestrator) - 
-//     the ONE exception is --approve-harness recording `harness_sha` (see below)
-//   - refuses to run when the harness (this file + _state.json.harness_paths) has
-//     changed since the sha a human last approved with --approve-harness, so a
-//     round that edits the runner cannot execute unreviewed under a standing
-//     session allowlist
-//   - pairwise graders judge against frozen baseline/ref/<id>.* on disk
-//   - writes rows as cases complete (crash-safe)
-//   - jittered exponential backoff on transient 429/overloaded/5xx errors
-//   - hard per-case wall-clock ceiling (--timeout-s; stream keepalives don't reset it)
-//   - served-model assertion (response model must match --model; documented alias->snapshot
-//     shapes tolerated: 'foo-latest'/'foo-0'/'foo' -> 'foo-20250101' / 'foo@20250101' / 'foo-2025-01-01')
-//   - failed attempts land in errors.jsonl with a failure class and, when the call
-//     completed, the billed model/usage (never in results.jsonl)
-//   - row ids, trace filenames, and frozen refs share one path-safe id
-//     (original id kept in meta.original_id when sanitization changed it)
+// Catalog-grader eval; see README.md for usage and grade.mjs for scoring.
+// Harness scaffold: github.com/anthropics/skills,
+// skills/claude-api/shared/evals/report. Copyright Anthropic, Apache-2.0.
 
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -40,35 +11,19 @@ import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { claudeEnv, gradeReport, readDocs, spawnJson } from './grade.mjs';
 
-// Every output write refuses symlinks: the flow dir is model-influenced, and a
-// prompt-injected round can plant `results.jsonl -> ~/.bashrc` where the next
-// unattended run would append. POSIX opens O_NOFOLLOW (a symlink fails with
-// ELOOP); Windows - where Node leaves O_NOFOLLOW undefined and Bun defines a
-// meaningless value - lstat-refuses first. Symlinked parent dirs are
-// refused the same way. Same discipline as the report builders' reads.
+// Refuse links in model-influenced output paths. Windows lacks O_NOFOLLOW.
 const WIN = process.platform === 'win32';
 const NOFOLLOW = WIN ? 0 : FS.O_NOFOLLOW;
-// A guard that cannot tell must refuse: only "no such entry" reads as absent;
-// any other lstat failure (EACCES, ENAMETOOLONG, ...) is rethrown, never "no".
+// Only ENOENT means absent; other inspection failures must abort.
 const lstatOrNull = p => { try { return lstatSync(p); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; } };
 const isSymlink = p => lstatOrNull(p)?.isSymbolicLink() === true;
-// Stderr lines interpolate model-influenced bytes (case ids, error text that
-// can echo model output, JSON.parse messages). Strip escape sequences and
-// control characters, as build-report-lite.mjs's eprint does, so a planted
-// OSC/CSI can't retitle the terminal or forge output lines.
+// Strip terminal controls from model-influenced output.
 const ESC_SEQ = /\x1b\[[0-?]*[ -\/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?|\x1b[@-_]/g;
 const CONTROL = /[\x00-\x1f\x7f-\x9f]/g;
 const termSafe = s => String(s).replace(ESC_SEQ, '').replace(CONTROL, '');
 const eprint = (...a) => console.error(...a.map(termSafe));
-// The leaf checks above can't see a symlink on an INTERMEDIATE component
-// (lstat and open both resolve those silently), so every open is also bound
-// to the flow root: main() captures realpathSync(flow) once, and any path
-// whose resolved parent leaves it - e.g. `vdir` or the flow dir itself
-// replaced by a directory symlink - is refused when the check sees it.
-// Residual, all platforms: the check and the open are separate path lookups
-// (Node's sync fs has no openat-style call), so a directory swapped for a
-// symlink in between is still followed. This stops a planted link, not a
-// writer racing the run.
+// Resolve parents to catch intermediate links. Separate checks and opens
+// cannot prevent a concurrent directory swap; Node has no sync openat API.
 let flowRealRoot = null;
 function assertInFlow(dir, what) {
   if (flowRealRoot == null) throw new Error(`refusing to ${what}: flow root not resolved yet`);
@@ -84,25 +39,17 @@ function openNoFollow(p, flags) {
   try {
     const st = fstatSync(fd);
     if (!st.isFile()) throw new Error(`refusing to use non-regular file: ${p}`);
-    // O_NOFOLLOW and lstat cannot see a hard link: a second name for a file
-    // outside the flow dir opens as an ordinary regular file. Nothing the
-    // runner creates has more than one link, so refuse any that does.
+    // Hard links bypass symlink checks; runner-created files have one link.
     if (st.nlink > 1) throw new Error(`refusing to use ${p}: it has a second hard link (another name for the same file); replace it with a plain copy if it is yours`);
   } catch (e) { closeSync(fd); throw e; }
   return fd;
 }
-// writeFileSync on the fd loops until every byte lands (a bare writeSync is
-// one write(2) that may return short on ENOSPC and silently truncate a
-// results row or trace).
-// Opened without O_TRUNC and truncated only after openNoFollow's checks, so a
-// refused file keeps its bytes.
+// Check before truncating; writeFileSync handles short writes.
 function writeFileNoFollow(p, data) {
   const fd = openNoFollow(p, FS.O_WRONLY | FS.O_CREAT);
   try { ftruncateSync(fd, 0); writeFileSync(fd, data); } finally { closeSync(fd); }
 }
-// POSIX appends atomically under O_APPEND with no position. On Windows, Bun
-// writes an O_APPEND handle at offset 0 unless given a position, so there the
-// write starts at the current size and re-issues any short write.
+// Bun on Windows needs an explicit offset for O_APPEND handles.
 function appendFileNoFollow(p, data) {
   const fd = openNoFollow(p, FS.O_WRONLY | FS.O_CREAT | FS.O_APPEND);
   try {
@@ -116,52 +63,31 @@ function appendFileNoFollow(p, data) {
     }
   } finally { closeSync(fd); }
 }
-// Reads of the frozen pairwise refs get the same discipline as writes (same
-// open guard): the flow dir is model-influenced, so `baseline/ref/<id> ->
-// ~/.ssh/id_rsa` planted after the startup preflight must not be read into
-// the judge prompt. lexists probes with lstat so a planted symlink still
-// counts as "present" at the freeze guard (never overwritten - or followed).
+// Count symlinks as present so the freeze guard cannot overwrite them.
 const lexists = p => lstatOrNull(p) != null;
 function readFileNoFollow(p) {
   const fd = openNoFollow(p, FS.O_RDONLY);
   try { return readFileSync(fd, 'utf8'); } finally { closeSync(fd); }
 }
-// null when the file is absent; any other failure (a planted link included) throws.
 function readIfPresent(p) {
   try { return readFileNoFollow(p); } catch (e) { if (e?.code === 'ENOENT') return null; throw e; }
 }
 function mkdirNoFollow(dir) {
   if (isSymlink(dir)) throw new Error(`refusing to use symlinked directory: ${dir}`);
   mkdirSync(dir, { recursive: true });
-  // Check after creating: mkdirSync(recursive) follows symlinked ancestors,
-  // so a dir minted through one resolves outside the flow root and is refused
-  // here before any file lands in it.
+  // Recursive mkdir follows ancestor links; recheck before writing files.
   assertInFlow(dir, 'create directory');
 }
-// Frozen pairwise refs may carry an extension; reader and freeze-guard probe
-// the same list so a suffixed ref never gets an extensionless shadow.
+// Readers and freeze guards must recognize the same reference extensions.
 const REF_EXTS = ['', '.html', '.txt', '.json'];
 
-// --- catalog-grader eval ----------------------------------------------------
-//
-// Each case is one published catalog whose facts were frozen once by
-// freeze/freeze.sh (cases/<id>/frozen). A run copies the frozen facts into a
-// fresh temporary directory, starts headless Claude Code there with only the
-// plugin loaded, and asks it to grade the catalog from Step 2 of the skill.
-// The grader reads the report.json the agent wrote.
-//
-// Isolation: the agent sees a staged copy of the plugin (.claude-plugin and
-// skills only), so gold.json is not on any path it can reach. It runs with a
-// clean CLAUDE_CONFIG_DIR that holds only a link to the user's credentials, so
-// no user CLAUDE.md, hooks, plugins, memory, or output style reach it. It runs
-// with --permission-mode dontAsk and an allowlist, so anything else is denied.
+// Catalog-grader cases
 
 const EVAL_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(EVAL_DIR, '..', '..');
 const AGENT_TOOLS = ['Read', 'Write', 'Edit', 'Glob', 'Grep', 'WebFetch', 'Skill',
   'Bash(python3 *)', 'Bash(uv run *)', 'Bash(jq *)', 'Bash(ls *)', 'Bash(wc *)', 'Bash(head *)'];
-// The judge must not be the model under test: set CG_EVAL_JUDGE when the
-// grader itself runs on Sonnet.
+// Keep the judge distinct from the tested model.
 const JUDGE_MODEL = process.env.CG_EVAL_JUDGE ?? 'claude-sonnet-5-5';
 
 let staged = null; // { pluginDir, configDir }, made once per process
@@ -173,9 +99,7 @@ function stage() {
   cpSync(join(REPO_ROOT, 'skills'), join(pluginDir, 'skills'), { recursive: true });
   const configDir = join(root, 'config');
   mkdirSync(configDir, { mode: 0o700 });
-  // On Linux a login is a file, which the clean config can link. On macOS the
-  // login is a Keychain entry keyed to the config directory, so a clean
-  // directory cannot see it; a token or an API key is required there.
+  // Linux credentials can be linked; macOS Keychain login needs a token.
   const cred = join(homedir(), '.claude', '.credentials.json');
   if (existsSync(cred)) symlinkSync(cred, join(configDir, '.credentials.json'));
   else if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_CODE_OAUTH_TOKEN)
@@ -215,7 +139,7 @@ function taskPrompt(c) {
 }
 
 
-// stream-json events -> SCHEMA.md Turn[]
+// Convert stream-json events to report transcript turns.
 function toTranscript(events, prompt) {
   const turns = [{ role: 'user', content: prompt }];
   for (const ev of events) {
@@ -242,9 +166,6 @@ function toTranscript(events, prompt) {
   return turns;
 }
 
-// CG_EVAL_REGRADE_FROM=<variant dir> re-scores the reports a previous run
-// wrote, without running the grader again. Use it after a scoring change:
-// move the old variant aside, then run into the same variant name.
 function regradeCase(input, ctx) {
   const src = resolve(process.env.CG_EVAL_REGRADE_FROM);
   const row = readFileSync(join(src, 'results.jsonl'), 'utf8').split('\n').filter(Boolean)
@@ -316,22 +237,20 @@ function gradeCase(input, run, ref, ctx) {
   return gradeReport(input, run, { env: claudeEnv(stage().configDir), judgeModel: JUDGE_MODEL });
 }
 
-/** Side-channel perf fields beyond the built-ins (latency_s etc.). */
 function perfFrom(run) {
-  // A regraded row keeps the original run's latency, not the regrade's.
+  // Preserve original latency when regrading.
   return { ...(run.latency_s != null ? { latency_s: run.latency_s } : {}),
            cc_cost_usd: run.cc_cost_usd, num_turns: run.num_turns, tool_calls: run.tool_calls,
            report_grade: run.reportText ? (() => { try { return JSON.parse(run.reportText).grade; } catch { return null; } })() : null };
 }
 
-// --- harness (you usually won't need to touch below this line) --------------
+// Harness
 
 function parseArgs(argv) {
   const a = { flow: '.claude/hillclimb/flow', variant: 'baseline',
               model: undefined, reps: 1, concurrency: 4, timeoutS: 1800,
               approveHarness: false };
-  // A flag at the end of argv would otherwise consume undefined - which for
-  // --model equals the default and silently disables the served-model check.
+  // Missing --model values would disable the served-model check.
   const val = (i) => { if (argv[i] === undefined) { eprint(`missing value for ${argv[i - 1]}`); usage(); process.exit(2); } return argv[i]; };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
@@ -346,9 +265,7 @@ function parseArgs(argv) {
     else { eprint(`unknown argument: ${k}`); usage(); process.exit(2); }
   }
   if (!/^(baseline|v[1-9]\d*)$/.test(a.variant)) {
-    // The report only reads directories named 'baseline' or 'v<N>' - any other
-    // name runs to completion but spends the pass into a directory the Summary,
-    // trajectory, and budget arithmetic never see.
+    // The report discovers only baseline and v<N> directories.
     eprint(`--variant must be 'baseline' or 'v<N>', got '${a.variant}'`);
     usage(); process.exit(2);
   }
@@ -362,28 +279,9 @@ function usage() {
   eprint('usage: node run-eval.mjs --flow DIR --variant ID [--model ID] [--reps N] [--concurrency N] [--timeout-s N (0 = no ceiling)] [--approve-harness]');
 }
 
-// Harness integrity gate. The hillclimb loop gets this runner command
-// allowlisted for the session and then runs rounds unattended, while the
-// per-round change (proposed by an analyzer fed untrusted transcripts) may
-// legitimately edit harness code. Without this gate a round that rewrites the
-// runner would execute attacker-chosen code on the next unattended run under
-// the user's one-time approval. So: sha256 over this file, any lockfile
-// beside it or in the directory the runner is invoked from (dependency drift
-// is harness drift too; with neither, a note says so), plus
-// every path in `_state.json.harness_paths` (relative to the directory the
-// runner is invoked from, i.e. the repo root); compare to
-// `_state.json.harness_sha`; refuse on absent/mismatch unless a human passes
-// --approve-harness, which records the new sha. That write is the one
-// sanctioned exception to "never write _state.json".
-//
-// Scope, stated plainly: this is a change detector, not a security boundary.
-// The sha, the path list and this file all live where the loop agent can
-// write, so an agent that is already prompt-injected can forge the record or
-// pass --approve-harness itself. What it catches is the common case - a
-// round's harness edit reaching an unattended run unreviewed - and what
-// actually bounds an unattended run is the permission allowlist the user
-// grants the runner command (scope it to this exact command line, not a
-// prefix). Installed dependencies beyond the lockfile are outside the digest.
+// Detect harness changes before unattended runs. The agent can edit this
+// record, so permissions must constrain the exact runner command. Installed
+// dependencies beyond lockfiles are outside the digest.
 function checkHarness(statePath, st, approve) {
   const self = fileURLToPath(import.meta.url);
   const listed = Array.isArray(st.harness_paths) ? st.harness_paths.map(String) : [];
@@ -406,7 +304,6 @@ function checkHarness(statePath, st, approve) {
   }
   const sha = h.digest('hex');
   if (st.harness_sha === sha) return;
-  // Said only here, where a person is about to approve or is being refused.
   if (!lockfiles.length) eprint('note: no lockfile beside the runner or in the current directory - dependency changes are outside the harness sha');
   if (approve) {
     st.harness_sha = sha;
@@ -425,16 +322,9 @@ function checkHarness(statePath, st, approve) {
   process.exit(2);
 }
 
-// Transient provider errors (429 / overloaded / 5xx) retry with jittered
-// exponential backoff - a zero-delay retry loop multiplies cost invisibly
-// under rate limits and can turn one transient 429 into a torn-down batch.
-// The attempt count lands in the row's meta (or the errors sidecar) so retry
-// churn is visible in the data, not just the bill.
 async function withBackoff(fn, retry, deadline = Infinity, tries = 5) {
   for (let attempt = 0; ; attempt++) {
-    // Checked before every attempt, not just before sleeps: once the case's
-    // ceiling has passed, an abandoned chain must not issue another call
-    // (e.g. a judge call after the app call consumed the whole ceiling).
+    // Enforce the deadline before both model and judge attempts.
     if (Date.now() >= deadline) {
       const e = new Error('wall-clock ceiling exceeded before attempt');
       e.failure_class = 'timeout';
@@ -446,8 +336,6 @@ async function withBackoff(fn, retry, deadline = Infinity, tries = 5) {
         || /overloaded|rate.?limit/i.test(String(e?.message ?? ''));
       if (!transient || attempt >= tries - 1) throw e;
       const delay = Math.min(60_000, 1000 * 2 ** attempt) * (0.5 + Math.random());
-      // Never start a retry that would outlive the case's wall-clock ceiling - 
-      // otherwise an abandoned chain keeps issuing API calls after the case failed.
       if (Date.now() + delay >= deadline) throw e;
       retry.count++;
       await new Promise(r => setTimeout(r, delay));
@@ -455,9 +343,8 @@ async function withBackoff(fn, retry, deadline = Infinity, tries = 5) {
   }
 }
 
-// Hard per-case wall-clock ceiling, independent of stream liveness - a hung
-// SSE stream can emit keepalives forever, defeating inactivity-based timers.
-// The underlying call may keep running; the case fails and the slot is freed.
+// A wall-clock limit handles streams that keep sending keepalives.
+// The underlying call may continue after the slot is freed.
 function withTimeout(promise, seconds, label) {
   if (!(seconds > 0)) return promise;
   let timer;
@@ -471,53 +358,35 @@ function withTimeout(promise, seconds, label) {
   return Promise.race([promise, ceiling]).finally(() => clearTimeout(timer));
 }
 
-// Case ids appear in file paths AND as the row/file join key the report uses,
-// so rows, trace filenames, and frozen refs all carry the same path-safe id.
-// When sanitization changes the id, a short content hash keeps distinct ids
-// distinct ('case/1' vs 'case_1'); the original rides in meta.original_id.
+// Use one path-safe ID for rows, traces, and references; hash changed IDs
+// to avoid collisions and keep the original in meta.original_id.
 function pathSafeId(id) {
   const raw = String(id);
   const cleaned = raw.replace(/[^\w.-]/g, '_');
-  // Idempotent by construction: anything already path-safe and within the
-  // length bound - including this function's own truncated+suffixed output - 
-  // passes through unchanged. Long ids (URLs, prompt text as id) truncate to
-  // 120 chars plus an 8-hex hash of the full original, so they fail here, not
-  // at the trace write after the spend, and distinct ids stay distinct.
+  // Preserve already-safe IDs, including this function's own output.
   if (cleaned === raw && raw.length <= 129) return raw;
   return `${cleaned.slice(0, 120)}-${createHash('sha256').update(raw).digest('hex').slice(0, 8)}`;
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  // lstat("link/") follows the final symlink, so a trailing separator on
-  // --flow would blind every leaf isSymlink check below - strip it first.
-  // Only Windows treats `\` as a separator; on POSIX it is a filename byte, so
-  // splitting on it would walk prefixes that are not real path components.
+  // Trailing separators make lstat follow links. Backslash separates paths
+  // only on Windows.
   args.flow = args.flow.replace(WIN ? /(.)[\\/]+$/ : /(.)\/+$/, '$1');
   const flowSegments = args.flow.split(WIN ? /[\\/]/ : '/');
-  // A `.`/`..` segment (e.g. a trailing `/.`) makes isSymlink(args.flow) below
-  // resolve a different final component than the named dir - following a
-  // planted link at the flow root - while join() collapses it and the absolute
-  // branch skips the ancestor walk. Refuse dot segments outright
-  // (absolute --flow stays supported).
+  // Dot segments can make link checks and join() resolve different paths.
   if (flowSegments.some(seg => seg === '.' || seg === '..')) {
     eprint(`refusing to run: --flow must not contain '.' or '..' segments, got '${args.flow}'`);
     process.exit(2);
   }
   const vdir = join(args.flow, args.variant);
-  // Preflight every output path before the first model call: a planted
-  // symlink would otherwise fail each case after its (billed) run.
+  // Check output paths before paying for model calls.
   for (const p of [args.flow, join(args.flow, 'baseline'), vdir, join(vdir, 'traces'),
                    join(vdir, 'results.jsonl'), join(vdir, 'errors.jsonl'),
                    join(vdir, 'progress.txt'), join(args.flow, 'baseline', 'ref'), join(args.flow, '_state.json')])
     if (isSymlink(p)) { eprint(`refusing to run: ${p} is a symlink (the flow dir must hold regular files)`); process.exit(2); }
-  // A relative --flow (the documented `.claude/hillclimb/<name>` layout) is
-  // also lstat-walked component by component from the cwd: a pre-planted
-  // link at an ancestor (`.claude/hillclimb -> elsewhere`) would otherwise
-  // relocate the root capture below - the containment anchor itself - to the
-  // attacker's target. An absolute --flow is the caller's own trust decision
-  // and is not walked (an absolute ancestor link can be legitimate: /tmp on
-  // macOS).
+  // Reject relative ancestor links before capturing the containment root.
+  // Absolute paths may have legitimate ancestor links, such as macOS /tmp.
   if (!isAbsolute(args.flow)) {
     let walk = '';
     for (const part of flowSegments.filter(Boolean).slice(0, -1)) {
@@ -525,20 +394,13 @@ async function main() {
       if (isSymlink(walk)) { eprint(`refusing to run: ${walk} is a symlink (ancestor of --flow)`); process.exit(2); }
     }
   }
-  // Every later open/mkdir is bound to this resolved root (see assertInFlow):
-  // create the flow dir when fresh (the preflight above refused a link at it
-  // and, for a relative path, at every ancestor), then capture where it
-  // really resolves.
   mkdirSync(args.flow, { recursive: true });
   flowRealRoot = realpathSync(args.flow);
   mkdirNoFollow(join(vdir, 'traces'));
-  // _state.json is READ-ONLY here. The orchestrator owns it. Absent is fine
-  // (a baseline-only run has no loop state yet), but present-and-unparsable
-  // must not let the id-space gate below pass vacuously over a corrupt file.
+  // The orchestrator owns state; only --approve-harness writes it.
   const statePath = join(args.flow, '_state.json');
   let st = {};
-  // Read through the no-follow opener like every other flow-dir file; the
-  // parse message is not echoed (it can quote the file's first bytes).
+  // Suppress parse errors that could expose file contents.
   const stateText = readIfPresent(statePath);
   if (stateText != null) {
     try { st = JSON.parse(stateText) || {}; }
@@ -547,20 +409,16 @@ async function main() {
   checkHarness(statePath, st, args.approveHarness);
   const ctx = { ...args, state: st };
 
-  // Resume: which (id, rep) pairs already have a row?
   const resultsPath = join(vdir, 'results.jsonl');
   const done = new Set();
   for (const ln of (readIfPresent(resultsPath) ?? '').split('\n')) {
     if (!ln.trim()) continue;
     try { const r = JSON.parse(ln); done.add(`${r.prompt_id}\0${r.rep}`); } catch {}
   }
-  // Rows key on the path-safe id (see pathSafeId), so resume must too.
 
   const cases = await loadCases();
-  // Validate the id space before spending anything: duplicate path-safe ids - 
-  // including case-insensitive twins, which macOS/Windows filesystems collapse - 
-  // would silently overwrite traces and frozen refs; and a _state.json split id
-  // that matches no case would silently shrink the scored denominator.
+  // Reject ID collisions before model calls, including on case-insensitive
+  // filesystems. Split IDs must use the same sanitized form as result rows.
   const seen = new Map();
   for (const c of cases) {
     const k = pathSafeId(c.id).toLowerCase();
@@ -574,15 +432,13 @@ async function main() {
   for (const k of ['train_ids', 'val_ids', 'test_ids'])
     if (st[k] != null && !Array.isArray(st[k])) { eprint(`_state.json ${k} must be a list of ids`); process.exit(2); }
   for (const sid of [...(st.train_ids ?? []), ...(st.val_ids ?? []), ...(st.test_ids ?? [])]) {
-    const s = String(sid); // the adapter joins with String() on both sides - numeric ids are fine
-    if (safeIds.has(s)) continue; // matches a loaded case - definitionally valid
+    const s = String(sid);
+    if (safeIds.has(s)) continue;
     if (s !== pathSafeId(s)) {
-      // Can never match a row: rows key on path-safe ids. This is the silent
-      // shrunken-denominator bug - fail before anything is spent.
       eprint(`_state.json split id '${s}' is not a path-safe id - record split ids exactly as they appear in results.jsonl's prompt_id`);
       process.exit(2);
     }
-    // Well-formed but absent is legitimate (a trimmed top-K subset run) - note it, don't fail.
+    // Missing IDs are valid for subset runs.
     eprint(`note: split id '${s}' matches no loaded case (expected for a trimmed subset run)`);
   }
   const refDir = join(args.flow, 'baseline', 'ref');
@@ -595,9 +451,7 @@ async function main() {
 
   let i = 0, ok = 0, fail = 0;
   const errorsPath = join(vdir, 'errors.jsonl');
-  // A hard crash (power loss, ENOSPC) can leave a torn final line with no
-  // trailing newline; the next append would merge two rows into one permanently
-  // unparseable line. Isolate any fragment before appending anything.
+  // Isolate incomplete final rows so a new append cannot merge with them.
   for (const p of [resultsPath, errorsPath]) {
     const tail = readIfPresent(p);
     if (tail && !tail.endsWith('\n')) appendFileNoFollow(p, '\n');
@@ -607,30 +461,19 @@ async function main() {
       const { c, rep } = tasks[i++];
       const safeId = pathSafeId(c.id);
       const t0 = Date.now();
-      let lastRun = null;    // survives into the catch - billed spend on a failed attempt
-      let rowWritten = false; // set once the results row lands - the attempt is scored
+      let lastRun = null; // Keep billed usage on failure.
+      let rowWritten = false;
       const deadline = args.timeoutS > 0 ? t0 + args.timeoutS * 1000 : Infinity;
       const appRetry = { count: 0 }, judgeRetry = { count: 0 };
       try {
-        // One ceiling over the whole case - app call, identity check, and grading - 
-        // so a hung judge stream can't hold the slot either.
         const { run, g, latency_s } = await withTimeout((async () => {
           let tAttempt = t0;
           const run = await withBackoff(() => { tAttempt = Date.now(); return runCase(c, { ...ctx, rep }); },
             appRetry, deadline);
           lastRun = run;
-          // latency_s = the final app attempt only; backoff sleeps, failed
-          // attempts, and judge time are excluded (retry counts are in meta).
+          // Measure only the final app attempt, excluding retries and judging.
           const latency_s = (Date.now() - tAttempt) / 1000;
-          // Serving identity: fail loudly when the response was served by a model
-          // other than the one requested. Accept exact match or a documented
-          // alias->snapshot resolution - 'foo-latest'/'foo-0'/'foo' served as
-          // 'foo-20250101', 'foo@20250101', or 'foo-2025-01-01'. Anything else - 
-          // another snapshot of the requested pin, a sibling model, or the bare
-          // base id ('foo-latest' served as 'foo', an unversioned echo that can
-          // hide snapshot drift across rounds) - fails the attempt. Non-Anthropic
-          // id schemes (e.g. Bedrock's 'anthropic.claude-...-v1:0') need their own
-          // rule here.
+          // Allow exact model matches or dated snapshots of the requested alias.
           if (ctx.model && run.model && run.model !== ctx.model) {
             const base = ctx.model.replace(/-latest$|-0$/, '');
             const rest = String(run.model).startsWith(base)
@@ -641,12 +484,9 @@ async function main() {
               throw e;
             }
           }
-          // Frozen pairwise reference (never regenerated): baseline/ref/<id>.*
           let ref = null;
           if (args.variant !== 'baseline') {
             const p = join(refDir, safeId);
-            // A planted symlink throws (ELOOP) rather than feeding the judge
-            // its target; the case then fails loudly instead of leaking.
             for (const ext of REF_EXTS) {
               try { ref = readFileNoFollow(p + ext); break; }
               catch (e) { if (e?.code !== 'ENOENT') throw e; }
@@ -665,9 +505,7 @@ async function main() {
                 ...(judgeRetry.count ? { judge_retries: judgeRetry.count } : {}) }
             : c.meta,
           model: run.model, usage: run.usage, stop_reason: run.stop_reason,
-          // The report keys on `status`, not stop_reason: a clipped answer is
-          // counted and shown but kept out of the means. runCase may set
-          // run.status to override the max_tokens rule.
+          // The report excludes truncated rows from means by status.
           status: run.status ?? (run.stop_reason === 'max_tokens' ? 'truncated' : 'ok'),
           judge_model: g.judge_model ?? run.judge_model,
           judge_usage: g.judge_usage ?? run.judge_usage,
@@ -675,11 +513,11 @@ async function main() {
           grade: g.grade, explanation: g.explanation,
         };
         appendFileNoFollow(resultsPath, JSON.stringify(row) + '\n');
-        rowWritten = true; // past this point the attempt is scored - a later throw (trace write, ref freeze) must not also append an error row
+        rowWritten = true; // Later write failures must not double-count usage.
         if (run.transcript)
           writeFileNoFollow(join(vdir, 'traces', `${safeId}_rep${rep}.json`),
             JSON.stringify(run.transcript, null, 2));
-        // For pairwise: on the baseline run, freeze the reference output once.
+        // Freeze baseline references once for pairwise scoring.
         if (args.variant === 'baseline' && run.output != null
             && !REF_EXTS.some(ext => lexists(join(refDir, safeId) + ext))) {
           mkdirNoFollow(refDir);
@@ -690,22 +528,16 @@ async function main() {
       } catch (e) {
         fail++;
         if (rowWritten) {
-          // The attempt scored; only a post-row write (trace, ref) failed. An error
-          // row here would double-count the billed usage under the budget rule.
           eprint(`  [${args.variant}] ${c.id} rep${rep} scored, but a post-row write failed: ${e?.message || e}`);
           continue;
         }
-        // Failed attempts are data too - but they must not occupy the (case, rep)
-        // slot in results.jsonl, or resume would never re-run them.
+        // Keep failures out of results.jsonl so resume retries them.
         appendFileNoFollow(errorsPath, JSON.stringify({
           prompt_id: safeId, rep,
           ...(safeId !== String(c.id) ? { original_id: String(c.id) } : {}),
           failure_class: e?.failure_class ?? 'error',
           error: String(e?.message || e),
           retries: appRetry.count, judge_retries: judgeRetry.count,
-          // Billed-but-failed spend stays countable: when the app call completed
-          // before the failure (e.g. a served-model mismatch, a judge-stage
-          // ceiling), carry its identity and usage on the error row.
           model: lastRun?.model, usage: lastRun?.usage,
           judge_model: e?.judge_model ?? lastRun?.judge_model,
           judge_usage: e?.judge_usage ?? lastRun?.judge_usage,
@@ -715,10 +547,6 @@ async function main() {
       }
     }
   }
-  // One progress line every 30s (and to <vdir>/progress.txt) so "how far along
-  // is it?" is answerable from the background shell's output or one file read,
-  // without the orchestrator parsing results.jsonl mid-write. ETA is a plain
-  // rate extrapolation from this pass.
   const t0 = Date.now();
   const progress = () => {
     const done = ok + fail, total = tasks.length;
@@ -737,11 +565,6 @@ async function main() {
   process.exit(fail ? 1 : 0);
 }
 
-// Anything main() throws prints as one sanitized line, not a raw stack. Before
-// the workers start it is a refusal (a planted link at _state.json or
-// results.jsonl, an lstat that fails, an error from loadCases) and exits 2 like
-// the preflight refusals. After they start, only a failed errors.jsonl append
-// gets here; rows may already be on disk, so say that and exit 1.
 let workersStarted = false;
 main().catch(e => {
   const m = String(e?.message || e);

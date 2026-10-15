@@ -1,5 +1,4 @@
-# Local workflow. Tests the eval scorers in evals/*/. These tests make no
-# model calls, so they run on every pull request that touches an eval.
+# Test eval scorers without model calls.
 name: Evals
 
 on:
