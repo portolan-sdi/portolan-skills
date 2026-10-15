@@ -204,7 +204,7 @@ finding. Wait for approval before you touch the upstream repository.
 
 ## Repository rules
 
-- Use pnpm and `pnpm install --frozen-lockfile`.
+- Install dependencies with `pnpm install --frozen-lockfile`, even though
   `docs/widgets.md` still shows npm examples.
 - `portolan-browser` is ISC, not Apache-2.0. A derived browser keeps that license.
 - Never edit `CLAUDE.md`, or the `ops-sync` block of `AGENTS.md`. The next sync overwrites

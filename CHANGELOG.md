@@ -11,13 +11,15 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - [`catalog-grader`](skills/catalog-grader/SKILL.md) grades catalog quality
   with evidence. Its [rubric](skills/catalog-grader/reference/rubric.md)
   replaces the specification's grader page.
-- [Catalog-grader eval](evals/catalog-grader/README.md), with frozen inputs,
-  scorer tests on pull requests, and a manually triggered eval workflow.
+- The [catalog-grader evaluation](evals/catalog-grader/README.md) tests the
+  skill against saved catalog data. Pull requests test the scorer, and
+  maintainers can start a full evaluation from a workflow.
 
 ### Fixed
 
-- Fact collection handles registry links, relative SQL paths, earlier SQL
-  setup, Python dependencies, and a separate rashid timeout.
+- The fact collector now reads registry links correctly, resolves relative
+  SQL paths, reuses earlier SQL setup, installs Python dependencies, and
+  gives rashid a separate timeout.
 
 ### Changed
 

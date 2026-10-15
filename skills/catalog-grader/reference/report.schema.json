@@ -26,14 +26,14 @@
     },
     "catalog": {
       "type": "string",
-      "description": "Graded root catalog.json URL or directory."
+      "description": "The root catalog.json URL or directory you graded."
     },
     "repo": {
       "type": [
         "string",
         "null"
       ],
-      "description": "Repository path, or null if unavailable."
+      "description": "The source repository path, or null if you do not have it."
     },
     "grade": {
       "enum": [
@@ -47,7 +47,7 @@
     },
     "complete": {
       "type": "boolean",
-      "description": "False if required facts are unavailable."
+      "description": "If required facts are unavailable, set this to false."
     },
     "incomplete_reasons": {
       "type": "array",
@@ -201,7 +201,7 @@
       "items": {
         "type": "string"
       },
-      "description": "Grade after each rubric step, in order."
+      "description": "Record the grade after each rubric step, in order."
     },
     "findings": {
       "type": "array",
@@ -223,7 +223,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Node paths whose docs the grader read in full."
+          "description": "The paths of nodes whose documents you read in full."
         },
         "claims_checked": {
           "type": "integer",
@@ -309,7 +309,7 @@
       "properties": {
         "node": {
           "type": "string",
-          "description": "Node path in facts.json; \".\" for the root."
+          "description": "The node path in facts.json, with \".\" for the root."
         },
         "file": {
           "type": "string",
@@ -360,7 +360,7 @@
             "major",
             "minor"
           ],
-          "description": "invented: honesty cap; major: area toward D; minor: area toward B."
+          "description": "Invented findings count toward the honesty grade limit. Major findings lower an area toward D, and minor findings lower it toward B."
         },
         "kind": {
           "enum": [
@@ -386,7 +386,7 @@
             "string",
             "null"
           ],
-          "description": "Exact quote from where.file; null only for absent content."
+          "description": "Copy the text at where.file exactly. If the finding concerns missing content, use null."
         },
         "fact": {
           "type": [
@@ -397,11 +397,11 @@
         },
         "evidence": {
           "type": "string",
-          "description": "What the grader checked, and what it found."
+          "description": "Describe what you checked and found."
         },
         "fix": {
           "type": "string",
-          "description": "One sentence."
+          "description": "Describe the fix in one sentence."
         }
       }
     }

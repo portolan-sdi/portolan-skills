@@ -5,8 +5,9 @@
 # ///
 """Collect catalog facts and save source documents and images.
 
-Runs catalog SQL and Python; --run-shell also runs shell blocks.
-Use a disposable environment, such as a CI runner.
+Because this collector runs SQL and Python from catalog documents, use a
+disposable environment, such as a CI runner. Add --run-shell to run shell
+blocks too.
 """
 
 from __future__ import annotations

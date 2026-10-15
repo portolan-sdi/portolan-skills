@@ -99,14 +99,14 @@ A fresh clone in CI has the metadata and not the data, so asset hrefs do not res
 
 ### Test the documented queries and claims
 
-Add documentation checks. The template has none. Read query blocks directly from Markdown under `catalog/`, without keeping a second copy.
+The template does not test documented queries or claims, so add a check that reads them directly from Markdown under `catalog/`. Keep the queries in the docs rather than maintaining a second copy in the tests.
 
-* Run each query against published URLs. Fail on errors or empty results. Mark intentional empty results and incomplete query fragments before their fences.
-* For each data claim, include a check query beside it, such as in an HTML comment. Return rows that contradict the claim. Fail if any exist.
-* Run checks on pull requests, after uploads, and on a schedule suited to source updates.
-* On scheduled failure, open or update one issue. Close it when checks pass. Grant issue write permission only to that job.
+* Run each query against the published URLs and fail the check if it errors or returns no rows. If a query should return no rows or is an incomplete fragment, mark that exception before its fence.
+* Beside each data claim, include a query that returns rows contradicting it. You can put the query in an HTML comment. If the query returns any rows, fail the check.
+* Run the checks on pull requests, after uploads, and on a schedule that matches how often the source changes.
+* If a scheduled check fails, open an issue or update the existing one, then close it when the checks pass. Grant issue write permission only to the job that manages this issue.
 
-Choose the engine and setup for the data. See [phl-housing-demo](https://github.com/nlebovits/phl-housing-demo), which runs documented SQL with DuckDB after refreshes.
+Choose a query engine and setup that suit the data. The [Philadelphia housing example](https://github.com/nlebovits/phl-housing-demo) runs documented SQL with DuckDB after each refresh.
 
 For row counts and percentages, provide a query instead of a value that can go stale.
 
@@ -127,7 +127,7 @@ When maintaining a catalog:
 * **`portolan push` and `tools/publish.py` do not interoperate.** `portolan push` tracks uploads in `versions.json`, a CLI artifact keyed on sha256. The template's `tools/publish.py` keeps no state and compares local size and MD5 against the bucket listing. Pick one per catalog and say which in the repository's `AGENTS.md`.
 * **Edit the generator, not generated output.** If the repository has a `tools/` pipeline, change the source of the generated catalog.
 * **Do not widen the conformance allow-list to make CI pass.** Adding a finding to `ACCEPTED` in `tests/test_conformance.py` hides a defect in the catalog. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
-* **Investigate documentation check failures.** Correct the docs or unintended data changes. Do not delete or skip checks to make a run pass.
+* **Investigate documentation check failures.** Find out whether the docs or data changed, then correct the docs or fix any unintended data change. Do not delete or skip checks to make a run pass.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing omits `Content-Type`, so change detection does not notice.
 * **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 

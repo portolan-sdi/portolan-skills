@@ -1,14 +1,18 @@
-# catalog-grader eval
+# Evaluate catalog-grader
 
-Runs [catalog-grader](../../skills/catalog-grader/SKILL.md) from Step 2 on frozen
-catalog facts. [grade.mjs](grade.mjs) defines the metrics.
-[grade.test.mjs](grade.test.mjs) tests the checks that do not use a model.
+This evaluation runs the [catalog-grader skill](../../skills/catalog-grader/SKILL.md)
+from step 2 using saved catalog facts. The [scorer](grade.mjs) defines the
+metrics, and [unit tests](grade.test.mjs) cover the checks that don't use a model.
 
 ## Run
 
-Requires Node.js 20+, [uv](https://docs.astral.sh/uv/), and Claude Code 2.1.300+.
+You need Node.js 20 or later, [uv](https://docs.astral.sh/uv/), and Claude Code
+2.1.300 or later.
 On Linux, sign in to `claude`. On macOS, set `CLAUDE_CODE_OAUTH_TOKEN` from
 `claude setup-token`, or set `ANTHROPIC_API_KEY`.
+
+If the run stops for approval, review the listed files and add
+`--approve-harness` for one run.
 
 Run from the repository root:
 
@@ -24,8 +28,8 @@ python3 evals/catalog-grader/summary.py \
   .claude/hillclimb/catalog-grader/baseline
 ```
 
-After reviewing harness changes, add `--approve-harness` once. Repeat the command
-to resume a run. Failed attempts in `errors.jsonl` run again.
+To resume a run, repeat the runner command. It retries failed attempts listed
+in `errors.jsonl`.
 
 | Environment variable | Use |
 |---|---|
@@ -33,7 +37,8 @@ to resume a run. Failed attempts in `errors.jsonl` run again.
 | `CG_EVAL_JUDGE` | Set a judge model that differs from the tested model |
 | `CG_EVAL_REGRADE_FROM=<variant dir>` | Rescore saved reports after a scoring change |
 
-The **Eval catalog-grader** workflow runs the eval manually and uploads results.
+You can also run the evaluation from the **Eval catalog-grader** workflow,
+which uploads the results.
 Each case starts a paid Claude Code session.
 
 ## Update cases
@@ -44,10 +49,11 @@ Each case starts a paid Claude Code session.
    evals/catalog-grader/freeze/freeze.sh <case-id>
    ```
 
-2. Review `cases/<case-id>/frozen/facts.json` and saved documents. Add the grade
-   band and required findings to `gold.json`, naming the reviewer in `source`.
+2. Review `cases/<case-id>/frozen/facts.json` and the saved documents. Add the
+   expected grade band and required findings to `gold.json`, and name the
+   reviewer in `source`.
 3. [Pack and publish](../README.md#publish-frozen-inputs) the next version.
    Include `cases.json`, `gold.json`, and `frozen.lock` in one pull request.
 
-Gold describes the frozen catalog. To update it, freeze the case again and
-review its gold before publishing.
+To change a case's expected results, freeze the catalog again and review the
+changes before publishing.

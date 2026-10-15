@@ -6,14 +6,14 @@ Skills use the [Agent Skills](https://github.com/anthropics/skills) open standar
 
 The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
 
-See [evals](evals/README.md) to test skill changes.
+Use the [skill evaluations](evals/README.md) to test whether a change improves a skill's results.
 
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 
 ### `catalog-grader`
 
-Grade a published Portolan catalog from A+ to F and report findings with evidence. Use for catalog quality reviews, including registry submissions.
+Grade a published Portolan catalog from A+ to F and explain each finding with evidence. Use this skill when you need to review catalog quality, including a registry submission.
 
 ### `customize-portolan-browser`
 

@@ -1,20 +1,22 @@
-# Skill evals
+# Skill evaluations
 
-Each eval has cases, frozen inputs, maintainer-approved gold, a runner, and a
-scorer. See the [catalog-grader eval](catalog-grader/README.md) to run one.
-Results go in `.claude/hillclimb/<skill>/<variant>/`.
+Each evaluation runs test cases against saved inputs and compares the output
+with maintainer-approved expected results. To run one, follow the
+[catalog-grader instructions](catalog-grader/README.md). The runner saves
+results to `.claude/hillclimb/<skill>/<variant>/`.
 
-To compare a skill change, run `baseline` and `v1`, build `report.html`, and
-paste both summaries into the pull request's Verification section. Change gold
-in a separate pull request with a reason for each edit.
+To compare a skill change, run the unchanged skill as `baseline` and your change
+as `v1`. Build `report.html`, then paste both summaries into the pull request's
+**Verification** section. If you change the expected results, use a separate
+pull request and explain each edit.
 
 ## Publish frozen inputs
 
-`frozen.lock` pins a release tarball and its checksum. To publish a version:
+The `frozen.lock` file pins the published input archive and its checksum.
 
 1. Pack the inputs with `evals/_lib/frozen.sh pack EVAL_DIR VERSION`.
-2. Review the generated `cases/NOTICE.md` for sources and licenses. Remove
-   cases whose licenses prohibit redistribution and explain removals in the pull request.
+2. Review the sources and licenses in the generated `cases/NOTICE.md` file. If
+   a license prohibits redistribution, remove the case and explain why in the pull request.
    The copies retain their publishers' licenses.
 3. Commit and push `frozen.lock`. Create a prerelease at that commit with the
    tarball as its asset and `NOTICE.md` as its notes:
