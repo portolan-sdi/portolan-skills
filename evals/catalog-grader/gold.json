@@ -1,0 +1,81 @@
+{
+  "trimet": {
+    "band": [
+      "D"
+    ],
+    "key_findings": [
+      "rashid PTL-VIZ-006 errors on all 8 collections (multiple styles, none marked default), which cap the grade at D",
+      "legend labels absent from the data: BRY (rail-lines), MAX/SC (stops), BSC and MAX/SC (route-stops), BGRY, BRY, BG, O/AL/BL (rail-stops)",
+      "collection AGENTS.md SQL uses catalog-root-relative paths such as FROM 'routes/routes.parquet', which 404 from the document's own location",
+      "the repository cholmes/portolan-catalog-trimet runs rashid on pull requests but has no scheduled doc or claim check, and the root catalog has no rel:vcs link (the repo appears only in README prose), so the CI A requirement is not met"
+    ],
+    "notes": "Published against an older spec version. PTL-VIZ-006 is a newer rule, so the D reflects spec drift; the catalog was a good example when published.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15; repo finding revised after the repo was found, confirmed 2026-10-15"
+  },
+  "wb-fwi": {
+    "band": [
+      "B"
+    ],
+    "key_findings": [
+      "no logo, so the logo A requirement is not met",
+      "the via link to datacatalog.worldbank.org/search/dataset/0066912/global-wildfire-hazard returns 404 on all 3 collections and in each README",
+      "the 3 collection READMEs are near-identical (similarity about 0.99), but they differ only in return period and resource ID and cite the World Bank method; this is minor, not major"
+    ],
+    "notes": "rashid clean; CI runs rashid on pull requests and a scheduled live-claims workflow. The missing logo alone blocks A. Near-identical READMEs are minor when they restate one upstream dataset and cite the upstream docs (confirmed by nlebovits 2026-10-15); a major concision finding that drops the grade to C is wrong.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15"
+  },
+  "phl-housing-demo": {
+    "band": [
+      "D"
+    ],
+    "key_findings": [
+      "rashid PTL-LIV-002 errors on 9 assets (declared file:size does not match the served Content-Length), which cap the grade at D",
+      "cross-collection links such as .../phl-housing-demo/dor_parcel and .../dor_parcel/ return 404 or 400 (21 broken links in the root README and collection AGENTS.md files)",
+      "nearly every table:columns entry has no description, in all 10 collections",
+      "no logo, so the logo A requirement is not met"
+    ],
+    "notes": "Probably built against an older spec version, which likely explains the missing column descriptions and the link style. PTL-LIV-002 is a live check, not a newer rule: the served files no longer match the declared file:size, so the D cap holds regardless of spec version.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15"
+  },
+  "catalog": {
+    "band": [
+      "D"
+    ],
+    "key_findings": [
+      "1,839 rashid errors cap the grade at D: PTL-PRV-001 no producer provider (989), PTL-VIZ-001 missing thumbnails (537), PTL-FIL-001 missing AGENTS.md or README.md (151), PTL-FIL-002/003 bad agents or describedby links (151), PTL-LNK-006 structural links (8)",
+      "123 broken links, including rel:agents links to AGENTS.md files that return 404",
+      "all 80 documented code blocks that ran fail; Python examples read relative paths such as ./gemengd_riool.parquet",
+      "the report is incomplete: the crawl stopped at the 400-node limit and 283 nodes were not read",
+      "no logo and no repository, so the A requirements are not met"
+    ],
+    "notes": "Known-bad registry entry. Not F: the root reads and only 8 of the errors are structural.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15"
+  },
+  "planet-disasterdata": {
+    "band": [
+      "C",
+      "D"
+    ],
+    "key_findings": [
+      "rashid did not run (timed out after 1200s), so the ceiling is C and the report is marked incomplete",
+      "18 SQL examples wrap geometry in ST_GeomFromWKB and fail because the column is already GEOMETRY",
+      "18 of 49 nodes have no README.md or AGENTS.md",
+      "a Python example uses visual_cog without defining it (NameError even after the earlier blocks)"
+    ],
+    "notes": "Frozen with rashid timing out. This case tests the rashid-did-not-run rule. Re-freeze with a longer rashid timeout changes the gold.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15"
+  },
+  "portolan-nl": {
+    "band": [
+      "D"
+    ],
+    "key_findings": [
+      "rashid PTL-PRO-001 errors on 36 nodes (mirror without a rel:via link to the original source), which cap the grade at D",
+      "table:row_count is double the data in 5 collections because the parquet file is listed twice (assets data and <name>): sluizen 184 vs 92, bergingsgebieden 3090 vs 1545, waterkeringen 476 vs 238, zero_emissiezones 84 vs 42, inspire_buildings 48,373,522 vs 24,186,761",
+      "45 broken links: source.coop directory URLs such as .../portolan-nl/cbs/ return 400, and upstream PDOK OGC endpoints such as nationaleparken return 404",
+      "legend values absent from the data in existing_landuse_inspire (Dump site, Motorway, Railway), gebiedsindelingen (0-7) and mijnbouwconstructie"
+    ],
+    "notes": "The 2,224 PTL-AST-003 warnings (no file:size or file:checksum) are real but not required.",
+    "source": "drafted by Claude, confirmed by nlebovits 2026-10-15 (grade); key findings as drafted"
+  }
+}

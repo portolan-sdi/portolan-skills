@@ -18,7 +18,7 @@ repos:
         entry: scripts/vale_ai_tells.sh
         language: system
         pass_filenames: false
-        files: ^skills/.*\.md$|^README\.md$|^AGENTS\.md$|^\.vale\.ini$
+        files: ^skills/.*\.md$|^evals/.*\.md$|^README\.md$|^AGENTS\.md$|^\.vale\.ini$
 
   # Relative links and anchors, with the org rules. No network access.
   # CI checks external links weekly. See portolan-ops norms/ci.md.

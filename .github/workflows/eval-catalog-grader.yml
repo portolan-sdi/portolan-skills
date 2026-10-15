@@ -1,0 +1,81 @@
+# Local workflow. Runs the catalog-grader eval against the frozen inputs that
+# evals/catalog-grader/frozen.lock names. Each case is a full Claude Code
+# session, so a run costs money: a maintainer starts it by hand.
+#
+# It needs one repository secret: CLAUDE_CODE_OAUTH_TOKEN (from
+# `claude setup-token`) or ANTHROPIC_API_KEY. The report and the per-case
+# results are uploaded as an artifact.
+name: Eval catalog-grader
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model the skill runs on
+        default: claude-opus-5-5
+      judge:
+        description: Judge model (must differ from the model)
+        default: claude-sonnet-5-5
+      reps:
+        description: Repetitions per case
+        default: "1"
+      only:
+        description: Comma-separated case ids (empty runs every case)
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Claude Code
+        # An exact version, not a range. There is no lockfile for a global CLI.
+        run: npm install -g @anthropic-ai/claude-code@2.1.300 # zizmor: ignore[adhoc-packages]
+
+      - name: Fetch the frozen inputs
+        run: evals/_lib/frozen.sh fetch evals/catalog-grader
+
+      - name: Run the eval
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MODEL: ${{ inputs.model }}
+          CG_EVAL_JUDGE: ${{ inputs.judge }}
+          REPS: ${{ inputs.reps }}
+          CG_EVAL_ONLY: ${{ inputs.only }}
+        run: |
+          [ -n "$CG_EVAL_ONLY" ] || unset CG_EVAL_ONLY
+          [ -n "$ANTHROPIC_API_KEY" ] || unset ANTHROPIC_API_KEY
+          [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ] || unset CLAUDE_CODE_OAUTH_TOKEN
+          node evals/catalog-grader/run-eval.mjs \
+            --flow .claude/hillclimb/catalog-grader \
+            --variant baseline --model "$MODEL" \
+            --reps "$REPS" --concurrency 3 --timeout-s 2400
+
+      - name: Build the report
+        if: always()
+        run: |
+          node evals/_lib/build-report-lite.mjs .claude/hillclimb/catalog-grader/
+          python3 evals/catalog-grader/summary.py \
+            .claude/hillclimb/catalog-grader/baseline >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: catalog-grader-eval
+          path: .claude/hillclimb/catalog-grader/

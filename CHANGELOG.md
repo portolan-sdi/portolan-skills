@@ -26,6 +26,28 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   can score it.
 - `reference/rubric.md` replaces `specs/best-practices/grader.md`, which
   leaves the specification.
+- `evals/catalog-grader/` is an eval for the `catalog-grader` skill. It holds
+  25 registered and local catalogs and, for the confirmed ones, an expected
+  grade band and the findings a correct report must state. `run-eval.mjs`
+  runs headless Claude Code on each case and `grade.mjs` scores the report.
+  A report passes when it validates, the grade rules apply, every quote is
+  exact, it read enough collections, and the grade is in the band.
+- `evals/_lib/frozen.sh` packs and fetches the frozen inputs of an eval. Each
+  version is a release tarball that `frozen.lock` names by checksum.
+- The `Evals` workflow tests the eval scorers on each pull request. The
+  `Eval catalog-grader` workflow runs the eval when a maintainer starts it.
+
+### Fixed
+
+- `collect_facts.py` reads the registry export as a STAC catalog, so a
+  registered catalog no longer reports as unregistered.
+- `collect_facts.py` resolves relative paths in a bare `FROM 'file'` or
+  `JOIN 'file'`, and runs a failed SQL block again after the setup
+  statements of the earlier blocks.
+- `collect_facts.py` installs `pyarrow`, `fsspec`, and `aiohttp` for blocks
+  that use pandas or geopandas, and reports a missing module as an
+  environment error.
+- `collect_facts.py --rashid-timeout` sets the rashid limit on its own.
 
 ### Changed
 

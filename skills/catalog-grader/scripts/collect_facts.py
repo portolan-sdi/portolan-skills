@@ -54,6 +54,8 @@ READ_FN_RE = re.compile(
     r"\b(read_parquet|parquet_scan|read_csv|read_csv_auto|read_json|read_json_auto|st_read|parquet_metadata|parquet_file_metadata)\s*\(\s*'([^']+)'",
     re.IGNORECASE,
 )
+# DuckDB also reads a quoted file path in FROM or JOIN directly (a replacement scan).
+SCAN_RE = re.compile(r"\b(FROM|JOIN)\s+'([^']+)'", re.IGNORECASE)
 SQL_LANGS = {"sql", "duckdb"}
 # A claim check is a query in an HTML comment that returns the rows that
 # break the claim (see the git-backed-catalog skill). No rows means true.
@@ -420,7 +422,11 @@ print(json.dumps(out))
 ENV_ERROR_RE = re.compile(
     r"Failed to (download|install)[^\n]*extension|extension[^\n]*could not be (downloaded|installed)"
     r"|No solution found when resolving|Failed to (fetch|download)[^\n]*(pypi|files\.pythonhosted)"
-    r"|uv: command not found",
+    r"|uv: command not found"
+    # The script installs the packages a block imports. A module the block uses
+    # without importing it (numpy behind DuckDB's .df(), pyarrow behind pandas)
+    # is missing from the grader's environment, not from the catalog.
+    r"|ModuleNotFoundError: No module named|Use pip or conda to install",
     re.IGNORECASE,
 )
 # A relative path that does not resolve: a docs defect of its own kind.
@@ -481,7 +487,7 @@ def prepare_sql(code: str, doc_ref: str) -> tuple[str, list[str]]:
         rewritten.append(f"{path} -> {absolute}")
         return m.group(0).replace(f"'{path}'", f"'{absolute}'")
 
-    return READ_FN_RE.sub(fix, code), rewritten
+    return SCAN_RE.sub(fix, READ_FN_RE.sub(fix, code)), rewritten
 
 
 def run_sql(code: str, doc_ref: str, local_root: str | None, timeout: int, max_rows: int = 5) -> dict:
@@ -518,7 +524,12 @@ def python_packages(code: str) -> list[str]:
     except SyntaxError:
         names.update(re.findall(r"^\s*(?:from|import)\s+([A-Za-z_]\w*)", code, re.M))
     std = set(sys.stdlib_module_names)
-    return sorted({IMPORT_PACKAGES.get(n, n.replace("_", "-")) for n in names if n not in std})
+    packages = {IMPORT_PACKAGES.get(n, n.replace("_", "-")) for n in names if n not in std}
+    # pandas and geopandas read Parquet through pyarrow, which a reader installs but rarely imports.
+    # They open URLs through fsspec, whose HTTP filesystem needs aiohttp.
+    if packages & {"pandas", "geopandas"}:
+        packages |= {"pyarrow", "fsspec", "aiohttp"}
+    return sorted(packages)
 
 
 def strip_magics(code: str) -> tuple[str, list[str]]:
@@ -941,6 +952,18 @@ def similarity(nodes: list[dict], kind: str, limit: int = 60) -> list[dict]:
     return sorted(pairs, key=lambda p: -p["ratio"])[:40]
 
 
+def registry_urls(data: bytes) -> set[str]:
+    """Catalog URLs in the registry export.
+
+    The export is a STAC catalog that links each registered catalog as a
+    child. Older exports listed entries with a "url" field, so read both.
+    """
+    doc = json.loads(data)
+    urls = {link["href"] for link in doc.get("links", []) if link.get("rel") == "child" and link.get("href")}
+    urls |= set(re.findall(r'"url"\s*:\s*"([^"]+)"', data.decode("utf-8", "replace")))
+    return {u.rstrip("/") for u in urls}
+
+
 def run_rashid(rashid_cmd: list[str], catalog: str, data: bool, timeout: int) -> dict:
     cmd = [*rashid_cmd, "check", "--json", "--all"]
     if not data:
@@ -988,12 +1011,23 @@ PYTHON_LANGS = {"python", "py", "python3", "ipython", "pycon"}
 SHELL_LANGS = {"bash", "sh", "shell", "zsh", "console"}
 
 
+SQL_SETUP_RE = re.compile(r"^\s*(INSTALL|LOAD|SET|CREATE\s+(OR\s+REPLACE\s+)?(PERSISTENT\s+)?SECRET)\b", re.IGNORECASE)
+
+
+def sql_setup_statements(code: str) -> list[str]:
+    """The statements in a SQL block that change the session: extensions, settings, secrets."""
+    text = "\n".join(re.sub(r"--.*$", "", line) for line in code.splitlines())
+    return [stmt.strip() + ";" for stmt in text.split(";") if SQL_SETUP_RE.match(stmt)]
+
+
 def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> list[dict]:
     """Run the SQL and Python blocks in the docs, and the shell blocks when asked.
 
     Docs often split one program across blocks, as a notebook does. A Python
     block that fails on an undefined name runs again after the earlier
-    Python blocks of the same document.
+    Python blocks of the same document. A SQL block that fails runs again
+    after the setup statements (INSTALL, LOAD, SET, CREATE SECRET) of the
+    earlier SQL blocks, and the second result is kept only when it succeeds.
     """
     results: list[dict] = []
     for n in crawl.nodes:
@@ -1002,6 +1036,7 @@ def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> li
             if not doc or not doc.get("_blocks"):
                 continue
             earlier: list[str] = []
+            sql_setup: list[str] = []
             for b in doc["_blocks"]:
                 lang = b.lang or "(none)"
                 if lang in SQL_LANGS:
@@ -1019,6 +1054,12 @@ def run_doc_code(crawl: Crawl, max_blocks: int, timeout: int, shell: bool) -> li
                     continue
                 if runner == "sql":
                     res = run_sql(b.code, doc["href"], crawl.local_root, timeout)
+                    if not res.get("ok") and sql_setup:
+                        again = run_sql("\n".join([*sql_setup, b.code]), doc["href"], crawl.local_root, timeout)
+                        if again.get("ok"):
+                            again["ran_after_earlier_blocks"] = len(sql_setup)
+                            res = again
+                    sql_setup.extend(sql_setup_statements(b.code))
                 elif runner == "python":
                     res = run_python(b.code, doc["href"], crawl.local_root, timeout)
                     if not res["ok"] and earlier and "NameError" in (res.get("stderr") or ""):
@@ -1069,6 +1110,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--max-links", type=int, default=600)
     ap.add_argument("--max-nodes", type=int, default=400)
     ap.add_argument("--timeout", type=int, default=120, help="seconds per query and per fetch")
+    ap.add_argument("--rashid-timeout", type=int, default=None, help="seconds for the rashid run (default: 10 times --timeout)")
     args = ap.parse_args(argv)
 
     started = time.time()
@@ -1112,7 +1154,7 @@ def main(argv: list[str] | None = None) -> int:
     facts["rashid"] = (
         {"skipped": True}
         if args.no_rashid
-        else run_rashid(args.rashid.split() if args.rashid else default_rashid(), args.catalog if is_url(args.catalog) else local_root, args.rashid_data, args.timeout * 10)
+        else run_rashid(args.rashid.split() if args.rashid else default_rashid(), args.catalog if is_url(args.catalog) else local_root, args.rashid_data, args.rashid_timeout or args.timeout * 10)
     )
 
     if args.no_links:
@@ -1171,8 +1213,8 @@ def main(argv: list[str] | None = None) -> int:
         got = fetch(REGISTRY_EXPORT, args.timeout)
         if got.ok:
             try:
-                urls = re.findall(r'"url"\s*:\s*"([^"]+)"', got.data.decode("utf-8", "replace"))
-                facts["registry"] = {"registered": args.catalog in urls, "entries": len(urls)}
+                urls = registry_urls(got.data)
+                facts["registry"] = {"registered": args.catalog.rstrip("/") in urls, "entries": len(urls)}
             except Exception as exc:
                 facts["registry"] = {"error": str(exc)}
         else:

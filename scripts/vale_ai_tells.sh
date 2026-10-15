@@ -20,4 +20,4 @@ if [ ! -d .vale/styles/ai-tells ]; then
   exit 0
 fi
 
-exec vale --output=line skills README.md AGENTS.md
+exec vale --output=line skills evals README.md AGENTS.md

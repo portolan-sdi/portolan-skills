@@ -191,9 +191,42 @@ def test_prepare_sql_resolves_relative_paths_for_published_docs(facts_mod):
     assert facts_mod.prepare_sql("SELECT 1", "/local/AGENTS.md") == ("SELECT 1", [])
 
 
+def test_prepare_sql_resolves_bare_file_scans(facts_mod):
+    code = "SELECT * FROM 'stops/stops.parquet' s\nJOIN 'routes.parquet' r USING (id)\nWHERE s.x IN (SELECT x FROM read_parquet('a.parquet'));"
+    sql, rewritten = facts_mod.prepare_sql(code, "https://h.example/c/AGENTS.md")
+    assert "FROM 'https://h.example/c/stops/stops.parquet'" in sql
+    assert "JOIN 'https://h.example/c/routes.parquet'" in sql
+    assert "read_parquet('https://h.example/c/a.parquet')" in sql
+    assert len(rewritten) == 3
+    keep = "SELECT * FROM 's3://b/k.parquet'"
+    assert facts_mod.prepare_sql(keep, "https://h.example/c/AGENTS.md") == (keep, [])
+
+
+def test_sql_setup_statements(facts_mod):
+    code = "INSTALL spatial;\nLOAD spatial; -- for ST_ functions\nSET VARIABLE base = 'https://h.example';\nSELECT 1;\nCREATE OR REPLACE SECRET s (TYPE s3);"
+    assert facts_mod.sql_setup_statements(code) == [
+        "INSTALL spatial;", "LOAD spatial;", "SET VARIABLE base = 'https://h.example';", "CREATE OR REPLACE SECRET s (TYPE s3);",
+    ]
+    assert facts_mod.sql_setup_statements("-- LOAD spatial;\nSELECT 1;") == []
+
+
+def test_registry_urls_reads_child_links(facts_mod):
+    export = {
+        "type": "Catalog",
+        "links": [
+            {"rel": "self", "href": "https://raw.example/exports/catalogs.json"},
+            {"rel": "child", "href": "https://data.example/cholmes/trimet/catalog.json"},
+            {"rel": "child", "href": "https://data.example/other/catalog.json/"},
+        ],
+    }
+    urls = facts_mod.registry_urls(json.dumps(export).encode())
+    assert urls == {"https://data.example/cholmes/trimet/catalog.json", "https://data.example/other/catalog.json"}
+    assert facts_mod.registry_urls(b'{"entries": [{"url": "https://x.example/catalog.json"}]}') == {"https://x.example/catalog.json"}
+
+
 def test_python_packages(facts_mod):
     code = "import os, json\nimport geopandas as gpd\nfrom odc.stac import load\nfrom pystac_client import Client\n"
-    assert facts_mod.python_packages(code) == ["geopandas", "odc-stac", "pystac-client"]
+    assert facts_mod.python_packages(code) == ["aiohttp", "fsspec", "geopandas", "odc-stac", "pyarrow", "pystac-client"]
 
 
 def test_environment_errors_are_classified(facts_mod):
@@ -201,6 +234,10 @@ def test_environment_errors_are_classified(facts_mod):
     assert got["environment_error"] is True and got["missing_file"] is False
     got = facts_mod.classify({"ok": False}, "FileNotFoundError: data.parquet")
     assert got["environment_error"] is False and got["missing_file"] is True
+    got = facts_mod.classify({"ok": False}, "ModuleNotFoundError: No module named 'numpy'")
+    assert got["environment_error"] is True
+    got = facts_mod.classify({"ok": False}, 'ImportError: Missing optional dependency \'fsspec\'.  Use pip or conda to install fsspec.')
+    assert got["environment_error"] is True
 
 
 # ------------------------------------------------------------ end to end
@@ -245,7 +282,8 @@ def test_main_on_fixture(facts_mod, catalog, tmp_path):
     assert roads["AGENTS.md"]["claim_check_count"] == 2
 
     assert facts["agents_similarity"][0]["ratio"] == 1.0
-    broken = {Path(b["target"]).name for b in facts["links"]["broken"]}
+    # The fixture's external links are placeholders. Their status depends on the network, so check local links only.
+    broken = {Path(b["target"]).name for b in facts["links"]["broken"] if not b["target"].startswith("http")}
     assert broken == {"missing-license.txt"}
     assert facts["summary"]["thumbnails_likely_blank"] == ["rivers"]
     assert facts["registry"] == {"skipped": True}

@@ -6,6 +6,8 @@ Skills use the [Agent Skills](https://github.com/anthropics/skills) open standar
 
 The skills track the versions of portolan-cli, rashid, the specification, and the catalog template named in [`pins.toml`](pins.toml). `scripts/check_drift.py` checks every command, flag, rule id, and spec path in the skills against those versions, on each pull request and once a week.
 
+Some skills have an eval in [`evals/`](evals/README.md) that measures whether a change to the skill helps.
+
 <!-- BEGIN GENERATED: skills -->
 ## Skills
 

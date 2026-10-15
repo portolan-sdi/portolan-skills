@@ -5,3 +5,12 @@ __pycache__/
 .serena/
 .claude/worktrees/
 .vale/styles/
+.claude/hillclimb/**/traces/
+.claude/hillclimb/**/report.html
+.claude/hillclimb/**/trajectory/
+.claude/hillclimb/**/progress.txt
+evals/*/cases/*/frozen/
+evals/*/dist/
+.claude/hillclimb/**/*-run*/
+.claude/hillclimb/**/ref/
+evals/*/cases/NOTICE.md

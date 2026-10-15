@@ -1,0 +1,29 @@
+# Local workflow. Tests the eval scorers in evals/*/. These tests make no
+# model calls, so they run on every pull request that touches an eval.
+name: Evals
+
+on:
+  pull_request:
+    paths:
+      - "evals/**"
+      - "skills/*/reference/*.schema.json"
+      - ".github/workflows/evals.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scorers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Test the scorers
+        run: node --test evals/*/*.test.mjs
