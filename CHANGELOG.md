@@ -17,6 +17,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `sourcecoop` pushes with portolan-cli 0.8.0 on the first try (#65). The skill
+  sets `PORTOLAN_S3_ENDPOINT` and exports the `source-coop` credentials. It no
+  longer sets `PORTOLAN_PROFILE`, because 0.8.0 ignores `credential_process`.
+  The skill states that `s3://{org}/{product}/` works for every storage region.
+  It warns against a regional bucket URL, and it adds troubleshooting for
+  `InvalidAccessKeyId` and a stall at `169.254.169.254`.
 - The fact collector now reads registry links correctly, resolves relative
   SQL paths, reuses earlier SQL setup, installs Python dependencies, and
   gives rashid a separate timeout.
