@@ -21,7 +21,7 @@ Adapt a portolan-browser checkout into a publisher-branded interface for one exi
 
 ### `enrich-metadata`
 
-Fill a Portolan collection's metadata.yaml from the record that an open data portal publishes for the same dataset. Supports CKAN portals, DCAT data.json files, and Socrata portals. Find the matching record and show the proposed values. Write only the values the user approves, and never replace a value a person wrote. Use when a collection came from a data API, such as Carto, and its title, description, license, or keywords are thin or missing.
+Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. A script finds the record in a JKAN, CKAN, or Socrata portal. The skill covers the decisions the script cannot make - bundled records, producer versus uploader, copied records, broken licenses, and notices mixed into descriptions.
 
 ### `git-backed-catalog`
 
