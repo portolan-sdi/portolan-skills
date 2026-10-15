@@ -1,0 +1,63 @@
+{
+  "id": "f5d0ab3b-5549-486e-a619-1fc5702237f7",
+  "name": "unesco-data-for-zimbabwe",
+  "title": "Zimbabwe - Education Indicators",
+  "notes": "Education indicators for Zimbabwe.\n\nContains data from the UNESCO Institute for Statistics [bulk data service](http://data.uis.unesco.org) covering the following categories: National Monitoring (made ",
+  "dataset_source": "UNESCO Institute for Statistics (UIS)",
+  "organization": {
+    "title": "UNESCO"
+  },
+  "license_id": "cc-by-igo",
+  "license_title": "Creative Commons Attribution for Intergovernmental Organisations",
+  "license_url": "http://creativecommons.org/licenses/by/3.0/igo/legalcode",
+  "methodology": "Registry",
+  "caveats": "",
+  "dataset_date": "[1970-01-01T00:00:00 TO 2019-12-31T23:59:59]",
+  "data_update_frequency": "90",
+  "groups": [
+    {
+      "name": "zwe"
+    }
+  ],
+  "tags": [
+    {
+      "name": "demographics"
+    },
+    {
+      "name": "education"
+    },
+    {
+      "name": "indicators"
+    },
+    {
+      "name": "socioeconomics"
+    },
+    {
+      "name": "sustainable development"
+    }
+  ],
+  "maintainer": "a5c5296a-3206-4e51-b2de-bfe34857185f",
+  "resources": [
+    {
+      "id": "685d0768-17c5-4947-969d-4de446750704",
+      "name": "National Monitoring data",
+      "description": "National Monitoring ",
+      "format": "CSV",
+      "url": "https://data.humdata.org/dataset/f5d0ab3b-5549-486e-a619-1fc5702237f7/resource/685d0768-17c5-4947-969d-4de446750704/download/natmon_data_zwe.csv"
+    },
+    {
+      "id": "2eb7acc2-0fc3-4d64-b970-b6038263425e",
+      "name": "National Monitoring indicator list",
+      "description": "National Monitoring ",
+      "format": "CSV",
+      "url": "https://data.humdata.org/dataset/f5d0ab3b-5549-486e-a619-1fc5702237f7/resource/2eb7acc2-0fc3-4d64-b970-b6038263425e/download/natmon_indicatorlist_zwe.csv"
+    },
+    {
+      "id": "97eba96a-0a1c-457a-8324-6627a3f39439",
+      "name": "National Monitoring metadata",
+      "description": "National Monitoring ",
+      "format": "CSV",
+      "url": "https://data.humdata.org/dataset/f5d0ab3b-5549-486e-a619-1fc5702237f7/resource/97eba96a-0a1c-457a-8324-6627a3f39439/download/natmon_metadata_zwe.csv"
+    }
+  ]
+}

@@ -19,6 +19,10 @@ Grade a published Portolan catalog from A+ to F and explain each finding with ev
 
 Adapt a portolan-browser checkout into a publisher-branded interface for one existing Portolan catalog. Inspect the catalog, the browser, and the publisher's site, propose a design, wait for approval, then implement it through browser configuration before site-local code. Use when someone wants a custom, branded, or white-labeled STAC or Portolan browser for a catalog that already exists.
 
+### `enrich-metadata`
+
+Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. A script finds the record in a JKAN, CKAN, or Socrata portal. The skill covers the decisions the script cannot make - bundled records, producer versus uploader, copied records, broken licenses, and notices mixed into descriptions.
+
 ### `git-backed-catalog`
 
 Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
@@ -66,7 +70,7 @@ claude plugin marketplace add portolan-sdi/portolan-skills
 claude plugin install portolan
 ```
 
-Skills become available under the `portolan:` prefix: `portolan:catalog-grader`, `portolan:customize-portolan-browser`, `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
+Skills become available under the `portolan:` prefix: `portolan:catalog-grader`, `portolan:customize-portolan-browser`, `portolan:enrich-metadata`, `portolan:git-backed-catalog`, `portolan:portolan-bootstrap`, `portolan:portolan-cli`, `portolan:portolan-migrate`, `portolan:portolan-thumbnails`, `portolan:reading-portolan`, `portolan:register-catalog`, `portolan:report-catalog-issue`, and `portolan:sourcecoop`.
 
 ### Claude.ai (web and desktop apps)
 
@@ -90,6 +94,8 @@ gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/catalog-grader --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/customize-portolan-browser --consent
+gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
+  --path skills/enrich-metadata --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
   --path skills/git-backed-catalog --consent
 gemini skills install https://github.com/portolan-sdi/portolan-skills.git \
