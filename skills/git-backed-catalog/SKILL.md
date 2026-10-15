@@ -3,7 +3,7 @@ name: git-backed-catalog
 description: Create, maintain, or contribute to a Portolan catalog whose metadata is stored in a git repository, with CI that validates each change. Use when someone wants to publish a catalog they can roll back and take pull requests on, or wants to fix metadata in someone else's catalog.
 ---
 
-<!-- drift: depends-on: portolan-catalog-template, portolan-spec, rashid -->
+<!-- drift: depends-on: portolan-catalog-template, portolan-spec, rashid, portolan-browser -->
 
 # Git-Backed Portolan Catalogs
 
@@ -18,6 +18,10 @@ This pattern is useful for three reasons:
 See the [git-backed catalogs guidance](https://github.com/portolan-sdi/portolan-spec/blob/main/specs/best-practices/git-backed-catalogs.md) for the background and tradeoffs. The specification is ground truth. `rashid` implements it.
 
 Pick the mode that matches what the user asked for.
+
+## Catalog navigation
+
+Apply the [navigation contract](../portolan-bootstrap/reference/catalog-navigation.md) when you create or maintain a catalog. Replace the template's root `vcs` and `issues` placeholders, then emit the full link set on every catalog and collection. Generate the README link block and each child's browser link from the same configuration. Keep these steps in the repository's generator and checks.
 
 ## Mode A: create a new git-backed catalog
 

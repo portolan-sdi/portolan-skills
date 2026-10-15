@@ -3,7 +3,7 @@ name: portolan-bootstrap
 description: Build a complete, well-documented Portolan catalog from a data source. Research the data and its publisher, convert to cloud-native formats, write the documentation and styles that make it usable, and publish. Use when someone wants to publish, mirror, or 'portolan-ify' a dataset, an open data portal, an ArcGIS or WFS service, or a folder of geospatial files.
 ---
 
-<!-- drift: depends-on: portolan-cli, portolan-spec -->
+<!-- drift: depends-on: portolan-cli, portolan-spec, portolan-browser -->
 
 # Portolan Bootstrap
 
@@ -243,6 +243,10 @@ Every query in `AGENTS.md` must have been run against the published data. A reci
 ### Column Descriptions
 
 `table:columns` is where researched meaning lands (PORTO-FMT-046). A coded column copied through with no decoded meaning is unfinished work, whether or not the catalog validates. `MATERIAL` described as "material" adds nothing.
+
+### Catalog navigation
+
+Apply the [navigation contract](reference/catalog-navigation.md) to every catalog, subcatalog, collection, and README listing. Keep the link generation in the catalog project so each rebuild preserves it.
 
 ### Link Hygiene
 
