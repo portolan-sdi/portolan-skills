@@ -16,10 +16,10 @@ version = "v0.3.0"
 tag = "v0.2.0"
 
 [portolan-catalog-template]
-sha = "1aecb8a"
+sha = "12bbc92"
 
 [portolan-registry]
-sha = "08f0d52"
+sha = "b611f92"
 
 [portolan-browser]
-sha = "89e4d46"
+sha = "8a21daf"
