@@ -19,7 +19,7 @@ tag = "v0.2.0"
 sha = "12bbc92"
 
 [portolan-registry]
-sha = "b611f92"
+sha = "bbaecc4"
 
 [portolan-browser]
 sha = "8a21daf"
