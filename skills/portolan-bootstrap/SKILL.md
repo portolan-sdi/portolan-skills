@@ -346,12 +346,16 @@ WHERE NOT ST_Within(
 
 Check tile weight by opening the PMTiles in [pmtiles.io](https://pmtiles.io) and zooming. The first tile has to remain small, and the data still has to be complete at the zoom where people will look. Tightening one usually breaks the other, so confirm both after every tippecanoe change.
 
+A large PMTiles file can still pan slowly once the tiles are tuned. Each tile is a range request to the bucket. Offer the user a CDN in front of the bucket, and set it up from the provider's documentation. The CDN must honor `Range` requests (PORTO-CORE-043) and must not compress or transform the responses.
+
 Then run the validator. Once the catalog is published, run it again with `--live` and pass the published base URL, so the probe covers your host and skips upstream hosts you do not control:
 
 ```bash
 portolan check
 portolan check --live --url "<PUBLISHED_URL>"
 ```
+
+A range or CORS finding on a host the user controls is a setting on that host. Fix it from the provider's documentation, then run the live check again.
 
 Run `catalog-grader` on the local catalog before pushing and the published URL afterward. Report the overall and area grades at the final checkpoint.
 
@@ -396,6 +400,11 @@ Both paths then run through research, documentation, styles, and quality control
 
 Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperative, which is the common case, and the `git-backed-catalog` skill when the metadata belongs in a repository. After publishing, use the `register-catalog` skill to add the catalog to the registry.
 
+Check two settings before the first push to a bucket the user controls. On Source Cooperative, follow the `sourcecoop` skill instead.
+
+* **CORS.** Browsers cannot read the catalog without it. Set the bucket's CORS policy to meet PORTO-CORE-045. Follow the provider's CORS documentation.
+* **Access logging.** Ask the user whether to turn it on. Logs record only the reads made after logging starts, and a publisher who waits loses the launch traffic. Logging needs a separate bucket for the logs, and its storage costs money. Follow the provider's documentation for server access logs.
+
 ## Checkpoints and Failure Handling
 
 | Checkpoint | Present | Ask |
@@ -403,7 +412,7 @@ Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperativ
 | Research findings | Candidates, decoded columns, opaque columns, proposed license and producer | Proceed with this set? |
 | Discovery | Layer or file count, feature estimates, size, time, warnings | Proceed with extraction? |
 | Extraction complete | Success count, failures with reasons, total size | Continue? |
-| Destination | Options available | Where should this publish? |
+| Destination | Options available, CORS state, access-logging state | Where should this publish? Turn on access logging? |
 | License and contact | What the source states, and where it says it | Confirm license, host name, and url or email |
 | Style plan | Styles per collection, columns, distributions, legend viability | Approve before tiling? |
 | Quality control | Per-collection checklist results, overall and area grades | Fix now, or publish? |
@@ -423,6 +432,7 @@ Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperativ
 | Column meaning not found after research | Document the gap in `known_issues`. Do not guess |
 | Legend lists categories the data lacks | Fix the style before publishing, not after |
 | Thumbnail shows basemap only | Hand off to `portolan-thumbnails` before publishing |
+| Large PMTiles pan slowly after tile tuning | Offer a CDN in front of the bucket, set up from the provider's documentation |
 | Documented query fails when rerun | Fix the query or delete it. Do not publish it broken |
 | Source file cannot be carried as an asset | Keep the `via` link and record why in `processing_notes` |
 | Raster collection has scenes but no item directories | Relayout as one subdirectory per scene and re-add before publishing |

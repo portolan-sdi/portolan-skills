@@ -31,6 +31,12 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 - `portolan-bootstrap` grades the catalog with `catalog-grader` instead of
   the specification's grader page.
+- `portolan-bootstrap` sets CORS and asks about access logging
+  before the first push to a bucket the user controls. It offers
+  a CDN when large PMTiles stay slow. The provider's documentation
+  covers each setup. This replaces the proposed `portolan cors`,
+  `portolan cdn`, and `portolan stats` commands (portolan-cli #634,
+  #422, and #395).
 
 ## 0.5.0 - 2026-10-06
 
