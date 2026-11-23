@@ -48,7 +48,7 @@ The probe must be cheap. A refresh that probes a thousand layers daily cannot ex
 | Source | Edit signal | Count signal | Cadence | Known traps |
 |---|---|---|---|---|
 | ArcGIS FeatureServer | `editingInfo.dataLastEditDate` on the layer's `?f=json` | `query?where=1=1&returnCountOnly=true` | None in the service. Look for a cadence on the publisher's open data page, such as the "Update Frequency" field on OpenDataPhilly | `lastEditDate` also moves on a schema edit. Use `dataLastEditDate`, and fall back to `lastEditDate` only when the first is absent. A layer with edit tracking off has no `editingInfo`. ArcGIS Online throttles bursts, so retry with a growing pause. |
-| GeoNode | `last_updated` from `/api/v2/datasets` | WFS `GetFeature` with `resultType=hits` | `maintenance_frequency` on the dataset record | GeoNode moves `last_updated` only when a save goes through GeoNode. An edit made directly in the database behind GeoServer does not move it. Treat a changed count as a change too, and rely on the row hash for the rest. GeoServer ignores `srsName=EPSG:4326` for a layer whose CRS list lacks it, and answers in the native CRS. Check the CRS the extract declares. |
+| GeoNode | `last_updated` from `/api/v2/datasets` | WFS `GetFeature` with `resultType=hits` | `maintenance_frequency` on the dataset record | GeoNode moves `last_updated` only when a save goes through GeoNode. An edit made directly in the database behind GeoServer leaves it unchanged. Treat a changed count as a change too, and rely on the row hash for the rest. GeoServer ignores `srsName=EPSG:4326` for a layer whose CRS list lacks it, and answers in the native CRS. Check the CRS the extract declares. |
 
 No other source type has a reference implementation yet. CKAN, Socrata, plain WFS, and OGC API Features each expose different signals, and some expose none. When a source has no edit signal, compare the row count and the row hash on every run. Report what you learn about a new source so it can join this table.
 
@@ -106,7 +106,7 @@ When you build a refresh, report what the layout cost you on #1131. The maintain
 
 ## Dates in the metadata
 
-`updated` on each mirrored catalog and collection records when the mirror last synced from its source (PORTO-CORE-057). It does not record when the source changed. Put the source's own edit date in a separate field on each version asset and on the collection. The reference catalogs use a prefixed field, `phl:source_updated` and `pergamino:source_updated`. Until the spec defines a common field for this date, choose a name for your catalog and document it.
+`updated` on each mirrored catalog and collection records the time of the last sync from the source (PORTO-CORE-057). Put the source's own edit date in a separate field on each version asset and on the collection. The reference catalogs use a prefixed field, `phl:source_updated` and `pergamino:source_updated`. Until the spec defines a common field for this date, choose a name for your catalog and document it.
 
 Set the root catalog's `updated` to the newest collection `updated` below it.
 
@@ -142,6 +142,6 @@ Never add a dataset to the catalog because it appeared at the source. A public p
 | The row count moved during the extract | Discard the extract. The next run retries |
 | The new rows break a style | Hold the collection back. Fix the style against the new rows, then rerun that collection |
 | The archived file does not match its checksum | Stop. Something outside the refresh wrote to the bucket |
-| The bucket holds a version that git does not | A run published and failed to commit. Commit the run's saved metadata, then rerun |
+| The bucket holds a version that is missing from git | A run published and failed to commit. Commit the run's saved metadata, then rerun |
 | The source has no edit signal | Compare the row count and the row hash on every run |
 | A step in this skill fails for your source | Open a pull request against this skill |
