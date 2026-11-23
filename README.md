@@ -116,7 +116,7 @@ If your agent supports Agent Skills, install the skill directories in its docume
 | [`portolan-migrate`](skills/portolan-migrate/SKILL.md) | Bring an existing non-compliant catalog or published dataset into Portolan compliance without rebuilding it. |
 | [`portolan-thumbnails`](skills/portolan-thumbnails/SKILL.md) | Generate framed, checked thumbnails from Portolan collections using chiitiler (MapLibre GL Native). |
 | [`reading-portolan`](skills/reading-portolan/SKILL.md) | Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). |
-| [`refresh-catalog`](skills/refresh-catalog/SKILL.md) | Keep a mirrored Portolan catalog current with its live source. |
+| [`refresh-catalog`](skills/refresh-catalog/SKILL.md) | Re-extract a mirrored Portolan catalog from its live source on a schedule. |
 | [`register-catalog`](skills/register-catalog/SKILL.md) | Submit a Portolan catalog to the registry by following the registry README. |
 | [`report-catalog-issue`](skills/report-catalog-issue/SKILL.md) | Report a problem with a catalog registered in the Portolan registry by opening a catalog feedback issue against it. |
 | [`sourcecoop`](skills/sourcecoop/SKILL.md) | Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI. |

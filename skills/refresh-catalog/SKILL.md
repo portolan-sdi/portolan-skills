@@ -1,21 +1,21 @@
 ---
 name: refresh-catalog
-description: Keep a mirrored Portolan catalog current with its live source. Probe each source with two small requests, re-extract only the collections whose source changed, publish each change as a new version, and run the refresh on a schedule in CI. Work in progress. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to stay up to date, or asks how to detect upstream changes.
+description: Re-extract a mirrored Portolan catalog from its live source on a schedule. Probe each source with two small requests, re-extract only the collections whose source changed, publish each change as a new version, and run the refresh in CI. Work in progress. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to follow its source, or asks how to detect upstream changes.
 ---
 
 <!-- drift: depends-on: portolan-cli, portolan-spec -->
 
-# Refreshing a Mirrored Catalog
+# Refresh a mirrored catalog
 
-> **This skill is a work in progress.** Two catalogs use this pattern today, one per source type. Each new source teaches something. When a step does not hold, a source behaves in a way this page does not describe, or you find a better signal, report it. A pull request against this skill is the most useful report. An issue in [portolan-skills](https://github.com/portolan-sdi/portolan-skills/issues) is the next best. Use the pattern with care, and check each step against the source in front of you.
+> **This skill is a work in progress.** Each source type in this skill has exactly one reference catalog behind it, and a new source can break any step. Report a step that fails for your source, a source behavior this page omits, or a better signal. A pull request against this skill is the most useful report. An issue in [portolan-skills](https://github.com/portolan-sdi/portolan-skills/issues) also helps. Use the pattern with care, and check each step against the source in front of you.
 
-A mirror is correct on the day it is built. The source keeps changing after that. This skill keeps the mirror current: a scheduled job asks each source whether it changed, extracts only what did, and publishes each change as a new version. Earlier versions stay readable.
+A mirror matches its source on the day of the build. The source changes after that. In this skill, a scheduled job probes each source and extracts only the collections that changed. Each change becomes a new version, and the earlier versions remain in the bucket unchanged.
 
-Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-backed-catalog` skill puts its metadata in a repository with CI. This skill adds the refresh on top of both. It assumes the metadata lives in git, because git is the record of every version the refresh publishes.
+Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-backed-catalog` skill puts its metadata in a repository with CI. This skill adds the refresh on top of both. It assumes that git stores the metadata, because git records every version that the refresh publishes.
 
 ## Reference implementations
 
-Two catalogs built this pattern independently and arrived at the same design. Read the one closer to your source before you write code. Each has a `docs/refresh.md` that explains every step and every failure.
+phl-housing-demo and pergamino-ide-catalog built this pattern independently and reached the same design. Read the one closer to your source before you write code. Each has a `docs/refresh.md` that explains every step and every failure.
 
 | Catalog | Source | Schedule |
 |---|---|---|
@@ -28,15 +28,15 @@ The tools in both are plain Python scripts under `tools/`. Copy what fits. The p
 
 Each run walks every collection in a source list (`tools/sources.json` in both catalogs):
 
-1. **Probe** the source with two small requests: a timestamp for the last edit and a row count. See [Source signals](#source-signals).
-2. **Decide** whether the collection is due. See [When a collection is due](#when-a-collection-is-due). Most runs extract nothing.
-3. **Extract** the due collection to a scratch directory, repair invalid geometries, and sort the rows on a Hilbert curve. Read the row count before and after the extract. When the two differ, the publisher edited during the extract. Discard it and let the next run retry.
+1. **Probe** the source. One request reads the time of the last edit, and one reads the row count. See [Source signals](#source-signals).
+2. **Decide** whether the collection is due. See [Due collections](#due-collections). Most runs extract nothing.
+3. **Extract** the due collection to a scratch directory. Repair invalid geometries and sort the rows on a Hilbert curve. Read the row count before and after the extract. When the two differ, the publisher edited during the extract. Discard it and let the next run retry.
 4. **Compare** an order-independent hash of every row with the current version. Equal rows mean the source touched nothing that matters. Record the check and publish nothing. See [Skip versions that change nothing](#skip-versions-that-change-nothing).
 5. **Check the styles** against the new rows. A styled column that is gone, a category that held rows and now holds none, or a new value with no category holds the collection back. The `portolan-bootstrap` skill explains [why every legend entry must match the data](../portolan-bootstrap/SKILL.md#the-legend-rule).
 6. **Archive** the outgoing current file. Download it from the bucket, check it against the `file:checksum` in `collection.json`, and stage it as an earlier version. See [Versions](#versions).
 7. **Record** the new version in `collection.json`, write the new GeoParquet and PMTiles, and render a new thumbnail with the `portolan-thumbnails` skill. A render that fails the blank check keeps the previous image.
 8. **Gate** the result with the same checks CI runs on a pull request. The `git-backed-catalog` skill covers [the documented-query checks](../git-backed-catalog/SKILL.md#test-the-documented-queries-and-claims).
-9. **Publish**: every archive first, then the new data, then the metadata. Then run every documented query against the bucket.
+9. **Publish** the archives first and the new data next. Upload the metadata last. Then run every documented query against the bucket.
 10. **Commit** the published metadata to the default branch from a separate job.
 
 A collection that fails at any step rolls back. Its folder and its staged files return to their state before the run. The other collections still publish. The job then fails and opens an issue, or comments on the open one.
@@ -52,7 +52,7 @@ The probe must be cheap. A refresh that probes a thousand layers daily cannot ex
 
 No other source type has a reference implementation yet. CKAN, Socrata, plain WFS, and OGC API Features each expose different signals, and some expose none. When a source has no edit signal, compare the row count and the row hash on every run. Report what you learn about a new source so it can join this table.
 
-## When a collection is due
+## Due collections
 
 A collection is due when both conditions hold:
 
@@ -69,13 +69,13 @@ pergamino-ide-catalog maps GeoNode's `maintenance_frequency`, an ISO 19115 code,
 | `fortnightly` | 14 |
 | `monthly` and longer | 28 |
 
-phl-housing-demo sets each value by hand in `tools/sources.json`, next to the stated cadence and the URL of the page that states it (`frequency_source`). Its one "as needed" layer gets a `min_days` of 1, not 7. The two catalogs disagree on "as needed". Choose per layer, and record the reason next to the value.
+phl-housing-demo sets each value by hand in `tools/sources.json`, next to the stated cadence and the URL of the page that states it (`frequency_source`). Its one "as needed" layer gets a `min_days` of 1, not 7. The catalogs disagree on "as needed". Choose per layer, and record the reason next to the value.
 
-A first version is always due. A forced run ignores both conditions, but still publishes nothing when the rows hash the same.
+The first version of a collection is always due. With the force flag, a run ignores both conditions. It still publishes nothing when the rows hash the same.
 
 ## Skip versions that change nothing
 
-An edit signal says the source was saved, not that the rows changed. Hash the rows to find out. The hash must ignore row order, because a service can return the same rows in a different order. It must also survive the geometry repair in step 3, so normalize geometry before you hash it. Both reference catalogs use DuckDB with the spatial extension:
+An edit signal says the source was saved, not that the rows changed. Hash the rows to find out. The hash must ignore row order, because a service can return the same rows in a different order. It must also give one value for two repairs of the same geometry. Normalize geometry before you hash it. Both reference catalogs use DuckDB with the spatial extension:
 
 ```sql
 SELECT sum(hash(t)::HUGEINT)::VARCHAR || ':' || count(*)
@@ -89,7 +89,7 @@ A sum of per-row hashes ignores order. An XOR of the same hashes would also igno
 
 ## Versions
 
-Portolan has no settled model for earlier versions of collection data yet. [portolan-cli#1131](https://github.com/portolan-sdi/portolan-cli/issues/1131) tracks the decision. Until it lands, both reference catalogs use one layout, which they write with their own scripts:
+Portolan has no settled model for earlier versions of collection data yet. [portolan-cli#1131](https://github.com/portolan-sdi/portolan-cli/issues/1131) tracks the decision. Until the issue closes, both reference catalogs use one layout, which they write with their own scripts:
 
 | Path | Content | Changes |
 |---|---|---|
@@ -100,19 +100,19 @@ Portolan has no settled model for earlier versions of collection data yet. [port
 
 The asset named after the collection is the current version. Its URL never changes. Each earlier version is an asset named `version-<version>` with the role `archive`. The version label is the UTC date of the extract, and a second forced run on one day gets `<date>-2`.
 
-Never overwrite an object under `versions/`. Upload every archive before you replace any current file, so a failed upload never loses the only copy of a version. When the archived file does not match its recorded checksum, something else wrote to the bucket. Stop and find out what.
+Never overwrite an object under `versions/`, and upload every archive before you replace any current file. With that order, a failed upload cannot lose the only copy of a version. A checksum mismatch on the archived file means that another process wrote to the bucket, and you must find that process before you continue.
 
-When you build a refresh, report what the layout cost you on #1131. That issue decides what Portolan does next.
+When you build a refresh, report what the layout cost you on #1131. The maintainers use that issue to choose the Portolan model.
 
 ## Dates in the metadata
 
-`updated` on each mirrored catalog and collection records when the mirror last synced from its source (PORTO-CORE-057). It does not record when the source changed. Put the source's own edit date in a separate field on each version asset and on the collection. The reference catalogs use a prefixed field, `phl:source_updated` and `pergamino:source_updated`. No shared name exists yet. Pick one per catalog and document it.
+`updated` on each mirrored catalog and collection records when the mirror last synced from its source (PORTO-CORE-057). It does not record when the source changed. Put the source's own edit date in a separate field on each version asset and on the collection. The reference catalogs use a prefixed field, `phl:source_updated` and `pergamino:source_updated`. Until the spec defines a common field for this date, choose a name for your catalog and document it.
 
 Set the root catalog's `updated` to the newest collection `updated` below it.
 
 ## Numbers and dates in the documentation
 
-A refresh changes the data, and nothing rewrites the prose. A README that says "29,198 parcels" or "extracted 2026-08-26" is wrong after the next version.
+Each refresh changes the data, but nothing rewrites the prose. A phrase such as "29,198 parcels" or "extracted 2026-08-26" in a README is wrong after the next version.
 
 * Quote no numbers measured from the data. Point to `table:row_count` in `collection.json` and give a query.
 * Name no extraction date. Point to the version list in `collection.json`. A sentence about the first version may keep its date, because the first version never changes.
@@ -125,10 +125,10 @@ Both reference catalogs run the refresh as a GitHub Actions workflow, `.github/w
 
 * **Schedule** the run after the publisher's working day, so it sees the full previous day of edits. Check when edits arrive before you pick a time.
 * **Allow one writer.** The refresh and the metadata publish workflow share a concurrency group, so they never run at once.
-* **Request credentials late.** Sign in after the extract, so a short-lived token covers only the upload. Use the provider's workload identity federation. Store no key. Both reference catalogs document the Source Cooperative setup in the Credentials section of their `docs/refresh.md`.
+* **Request credentials late.** Sign in after the extract. The short-lived token then covers only the upload. Use the provider's workload identity federation. Store no key. Both reference catalogs document the Source Cooperative setup in the Credentials section of their `docs/refresh.md`.
 * **Separate the commit.** A second job with `contents: write` and no cloud credentials commits the published metadata. A run that published and then failed to commit leaves the bucket ahead of git. The publish workflow must detect that and stop.
 * **Report failures.** A third job opens one issue for a failed run, or comments on the open one.
-* **Offer manual inputs**: a collection list, a force flag, and a dry run that prints what is due and why.
+* **Offer manual inputs.** Accept a list of collections and a force flag. Add a dry run that prints what is due and why.
 
 ## New and removed datasets
 
@@ -144,4 +144,4 @@ Never add a dataset to the catalog because it appeared at the source. A public p
 | The archived file does not match its checksum | Stop. Something outside the refresh wrote to the bucket |
 | The bucket holds a version that git does not | A run published and failed to commit. Commit the run's saved metadata, then rerun |
 | The source has no edit signal | Compare the row count and the row hash on every run |
-| A step in this skill does not hold for your source | Open a pull request against this skill |
+| A step in this skill fails for your source | Open a pull request against this skill |
