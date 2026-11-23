@@ -10,7 +10,7 @@ description: Adapt a portolan-browser checkout into a publisher-branded interfac
 This skill adapts an existing browser to one publisher and one catalog. The result reuses
 the publisher's visual language and words. It stays a working Portolan browser.
 
-`cholmes/stlouis-data-browser` follows this shape for the City of St. Louis mirror.
+`cholmes/stlouis-data-browser` follows this structure for the City of St. Louis mirror.
 `cholmes/trimet-data-browser` follows it for the TriMet mirror. Both keep their changes in a
 small set of files, so `git pull upstream main` causes few conflicts.
 
@@ -153,7 +153,7 @@ Both forks replaced the upstream `.site` header row in `src/StacBrowser.vue` wit
 header component. Each passes the upstream props and events straight through, which keeps
 search, the sidebar, authentication, and the locale chooser working. Follow that pattern.
 
-Name a new file for the publisher, such as `StlHeader.vue`. Keep data-derived behavior
+Give each new file a name that identifies the publisher, such as `StlHeader.vue`. Keep data-derived behavior
 generic. Read catalog metadata. Never key behavior to a collection id, and never correct a
 metadata value in the interface.
 
@@ -189,7 +189,7 @@ Classify the failure instead.
 
 ## Step 5: Report findings by owner
 
-Give the user three lists. Name the affected route, collection, asset, or interface state for
+Give the user three lists. State the affected route, collection, asset, or interface state for
 every finding, and describe what you observed. Do not write "some legends are broken".
 
 1. **Custom browser changes.** What you implemented in this repository.
@@ -209,7 +209,7 @@ finding. Wait for approval before you touch the upstream repository.
 - `portolan-browser` is ISC, not Apache-2.0. A derived browser keeps that license.
 - Never edit `CLAUDE.md`, or the `ops-sync` block of `AGENTS.md`. The next sync overwrites
   both. Put repository rules below the block in `AGENTS.md`.
-- Record the customization surface in the new repository's `AGENTS.md`. Both forks include a
+- Record the customized files in the new repository's `AGENTS.md`. Both forks include a
   table that maps each file to what it owns.
 - Never fabricate a tile URL, a style name, or a hex value. Take each one from the source.
   Mark any value you chose rather than sampled.

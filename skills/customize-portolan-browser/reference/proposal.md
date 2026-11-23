@@ -7,7 +7,7 @@ Present this before you edit the browser. Keep it compact. Wait for approval.
 1. **Homepage and navigation hierarchy.** The proposed landing page, and the path from it to
    a collection.
 2. **Terminology changes.** Each stock STAC or Portolan word you replace, and the publisher
-   word that replaces it. Name the locale key for each one.
+   word that replaces it. State the locale key for each one.
 3. **Visual tokens and reused elements.** The palette, the fonts, the spacing, and the
    publisher assets you reuse. Give the source of each value.
 4. **Catalog-derived navigation.** The topics, departments, tags, or statistics you propose,

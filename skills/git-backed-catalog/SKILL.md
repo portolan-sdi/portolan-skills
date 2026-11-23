@@ -95,7 +95,7 @@ Its change detection compares a multipart object by size alone. Pass `--force` a
 
 ### CI checks links without the bytes
 
-A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally, so the full check runs where the bytes are.
+A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally. The full check then runs where the bytes are.
 
 ### Test the documented queries and claims
 
@@ -129,7 +129,7 @@ When maintaining a catalog:
 * **Do not widen the conformance allow-list to make CI pass.** Adding a finding to `ACCEPTED` in `tests/test_conformance.py` hides a defect in the catalog. Fix the finding or record a waiver in `docs/conformance.md` with a tracking issue.
 * **Investigate documentation check failures.** Find out whether the docs or data changed, then correct the docs or fix any unintended data change. Do not delete or skip checks to make a run pass.
 * **Content types matter.** After changing a file-type mapping, publish with `--force`. A bucket listing omits `Content-Type`, so change detection does not notice.
-* **Links and the publish step.** Keep structural links relative in the tracked tree, so the catalog validates at any path. A published root SHOULD carry an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
+* **Links and the publish step.** Keep structural links relative in the tracked tree. The catalog then validates at any path. A published root SHOULD include an absolute `self` link (PORTO-CORE-081). The template's `publish.py` does not write that link. Add it in the tracked `catalog.json` with the `public_base` URL, or add a rewrite to the publish step.
 
 ## Mode C: contribute to someone else's catalog
 

@@ -108,7 +108,7 @@ Compare the child links in `catalog.json` against the directories on disk. That 
 
 ### Count Every Defect Across Every Collection
 
-Sampling hides the shape of the problem. Count. One catalog's audit, which is a serviceable checklist for the next one:
+Sampling hides the extent of the problem. Count. One catalog's audit, which is a serviceable checklist for the next one:
 
 | Field | Found | Requirement |
 |---|---|---|
@@ -126,7 +126,7 @@ Sampling hides the shape of the problem. Count. One catalog's audit, which is a 
 
 Also look for unregistered custom fields, asset roles that disagree between collections, and `rel: via` links typed `text/html` where the response is GML.
 
-Then read `.portolan/metadata.yaml`. That catalog's carried literal `'TODO: Add value'` for contact, name, email, and licence, and the generated root README **published those placeholders as document text**, including a malformed `TODO: Add value <TODO: Add value>`. Generated documentation propagates whatever the metadata says, so unfilled templates become published prose.
+Then read `.portolan/metadata.yaml`. That catalog's file contained literal `'TODO: Add value'` for contact, name, email, and licence, and the generated root README **published those placeholders as document text**, including a malformed `TODO: Add value <TODO: Add value>`. Generated documentation propagates whatever the metadata says, so unfilled templates become published prose.
 
 Audit data from Parquet footer statistics rather than by reading rows. Nulls, minima, maxima, distinct values, geometry types, and schema drift across partitions all live in the column-chunk metadata. An entire 256-million-row integrity audit ran without touching row data.
 
@@ -202,7 +202,7 @@ Build a deliberately broken copy of the catalog, run the validator, and confirm 
 
 The template provides `docs/conformance.md` and an `ACCEPTED` set in `tests/test_conformance.py` that starts empty. A rule id enters `ACCEPTED` only alongside a row in that file. The row states what was accepted, where, why, and the issue that tracks it. Both or neither. A silently widened allow-list is a false claim about what the catalog conforms to.
 
-`reference/conformance.md` carries the one section a migrated catalog adds to the template's file.
+`reference/conformance.md` contains the one section a migrated catalog adds to the template's file.
 
 ### `stac-check` Is Advisory, and Currently Crashes
 
@@ -220,7 +220,7 @@ The highest-leverage fix in that migration was one sentence: `source.json` has t
 
 So before writing any style of your own, look for cartography the catalog already contains or the publisher still serves. Read the styling rules and the legend rule in `portolan-bootstrap`, which apply unchanged here.
 
-Expect two conversion limits. The CLI's SLD converter handles categorical rules, where a filter is `PropertyIsEqualTo` and becomes a `match` expression. A graduated class-break SLD carries a range filter instead, and the converter **skips those rules in silence**. There is no warning and no entry in the conversion report, so a choropleth degrades to a flat style that looks intentional. Where every rule is graduated, the converter reports the misleading `No valid symbolizers found in SLD rules`.
+Expect two conversion limits. The CLI's SLD converter handles categorical rules, where a filter is `PropertyIsEqualTo` and becomes a `match` expression. A graduated class-break SLD has a range filter instead, and the converter **skips those rules in silence**. There is no warning and no entry in the conversion report. Because of that silence, a choropleth degrades to a flat style that looks intentional. Where every rule is graduated, the converter reports the misleading `No valid symbolizers found in SLD rules`.
 
 Worse, a rule mixing equality with a range converts to something quietly wrong, because the filter search descends through the enclosing `And` and finds the equality alone.
 
@@ -228,7 +228,7 @@ Those styles are frequently the publisher's most considered cartography. In one 
 
 ### Defects no validator sees
 
-rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` carries the full detail:
+rashid does not parse style bodies. These appear only when you render, and `portolan-thumbnails` has the full detail:
 
 * `fill-opacity: 0.0`, which is invisible and valid.
 * `circle-color: #ffffff` against a white background.
@@ -269,7 +269,7 @@ These lessons cost rework:
 
 A flat catalog of 178 collections is hard to browse and expensive to fetch. Grouping one into 13 thematic sub-catalogs took it from 2,129 rashid errors to 239, because much of the error count was structural.
 
-Map collections to groups with an **explicit table**. Do not use a pattern match. A regex is harder to audit than a list, and a misfiled collection means a permanent ID change once the catalog is published. Validate the table. Every collection appears in exactly one group. Name the excluded set separately.
+Map collections to groups with an **explicit table**. Do not use a pattern match. A regex is harder to audit than a list, and a misfiled collection means a permanent ID change once the catalog is published. Validate the table. Every collection appears in exactly one group. List the excluded set separately.
 
 Do not collapse collections because the count feels large, and do not preserve all of them blindly either. Collection identity is a user-visible URL. Any substantial restructuring is a checkpoint.
 
@@ -297,7 +297,7 @@ Guard the prune list. Any remote key that matches one of the new prefixes but is
 
 **`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. PORTO-FMT-020 exempts the glob from the https-only rule for exactly this reason. Enabling asterisks in HTTP paths does not rescue it. The glob never expands over plain HTTP. The single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
 
-**A bucket name containing dots needs path-style addressing.** Virtual-host addressing fails TLS verification. The documented setup has to say so and name the endpoint. Otherwise the reader's first query fails.
+**A bucket name containing dots needs path-style addressing.** Virtual-host addressing fails TLS verification. The documented setup has to say so and state the endpoint. Otherwise the reader's first query fails.
 
 **Link checking by HTTP status does not work on Source Cooperative.** It is a single-page app and returns 200 for every path, including paths outside the product. Fetch the rendered page and read the emitted HTML.
 

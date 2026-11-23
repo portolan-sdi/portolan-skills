@@ -98,7 +98,7 @@ curl -s $COLL/collection.json | jq '{
 
 Each field reports the following:
 
-- `stac_extensions` carries `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json`. That URI is the only signal of the specification version (PORTO-CORE-006).
+- `stac_extensions` contains `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json`. That URI is the only signal of the specification version (PORTO-CORE-006).
 - `license` is an SPDX identifier, or `other` with a `rel: license` link (PORTO-CORE-058, PORTO-CORE-059). Report it before you redistribute anything.
 - `providers` lists at least one `producer` and exactly one `host`, last (PORTO-CORE-047). When the producer and the host are the same organization, the catalog is official. When they differ, the catalog is a mirror.
 - A mirror has a `via` link (`text/html`) to the original source (PORTO-CORE-053). It has a `canonical` link when the source publishes its own STAC (PORTO-CORE-054). It sets top-level `updated` to the last sync time (PORTO-CORE-057). Compare `updated` with the source when freshness matters.
@@ -113,7 +113,7 @@ An asset key means nothing. Filter on `roles` (PORTO-CORE-027). Each asset has a
 |---|---|---|
 | `data` | The primary GeoParquet, Parquet, or COG | `application/vnd.apache.parquet` or `image/tiff; application=geotiff; profile=cloud-optimized` |
 | `collection-mirror` | `items.parquet`, a stac-geoparquet copy of the items | `application/vnd.apache.parquet` |
-| `style` | A MapLibre GL style. One also carries `default`. | `application/vnd.mapbox.style+json` |
+| `style` | A MapLibre GL style. One also has the `default` role. | `application/vnd.mapbox.style+json` |
 | `visual` | The PMTiles file, when it is also a distribution asset | `application/vnd.pmtiles` |
 | `thumbnail` | Preview image | `image/png`, `image/jpeg`, or `image/webp` |
 | `source` | The upstream original a mirror converted from | Any |
@@ -130,7 +130,7 @@ Hrefs are relative to the file that holds them. An absolute asset href uses `htt
 - A single-file vector, tabular, or single-COG collection puts its `data` asset on the collection (PORTO-CORE-017).
 - A raster collection with several scenes puts one COG on each item. Items live at `{item_id}/{item_id}.json`. The collection should also publish `items.parquet` with the `collection-mirror` role (PORTO-FMT-040, PORTO-FMT-041). Query that file to find scenes instead of fetching every item JSON.
 - A partitioned vector collection puts its files behind `partition:glob` (PORTO-FMT-019). It may also list partitions as items.
-- A tabular collection is a Parquet `data` asset with no geometry column (PORTO-FMT-034). Its `extent.spatial.bbox` is the area the table refers to, not a footprint. When geometry and attributes live in separate files, the README documents the join columns and carries a working join example (PORTO-FMT-038). Copy that example.
+- A tabular collection is a Parquet `data` asset with no geometry column (PORTO-FMT-034). Its `extent.spatial.bbox` is the area the table refers to, not a footprint. When geometry and attributes live in separate files, the README documents the join columns and includes a working join example (PORTO-FMT-038). Copy that example.
 
 ## Step 3: Query vectors and tables with DuckDB
 
@@ -265,7 +265,7 @@ SELECT * FROM read_parquet(
 ) WHERE quadkey_prefix = '00';
 ```
 
-For `s3://`, set the region and, for a private bucket, the keys. Every partition file shares one schema (PORTO-FMT-021), so the glob queries as one table. When the partitions are also items, `items.parquet` or the item JSONs give each partition's bbox.
+For `s3://`, set the region and, for a private bucket, the keys. Because every partition file shares one schema (PORTO-FMT-021), the glob queries as one table. When the partitions are also items, `items.parquet` or the item JSONs give each partition's bbox.
 
 ## Step 5: read rasters
 
@@ -303,7 +303,7 @@ curl -s $COLL/collection.json \
 
 ### Use the published style
 
-A collection with PMTiles carries at least one style asset (PORTO-FMT-014). Filter assets on the `style` role (PORTO-CORE-069). When there are several, exactly one also carries `default` (PORTO-CORE-070). Each style is a complete MapLibre GL style, version 8, with media type `application/vnd.mapbox.style+json` (PORTO-FMT-015). Its `sources.data.url` is a path relative to the `styles/` directory, usually `../{name}.pmtiles`. Resolve it against the style URL before you load it.
+A collection with PMTiles has at least one style asset (PORTO-FMT-014). Filter assets on the `style` role (PORTO-CORE-069). When there are several, exactly one also has the `default` role (PORTO-CORE-070). Each style is a complete MapLibre GL style, version 8, with media type `application/vnd.mapbox.style+json` (PORTO-FMT-015). Its `sources.data.url` is a path relative to the `styles/` directory, usually `../{name}.pmtiles`. Resolve it against the style URL before you load it.
 
 ```bash
 curl -s $COLL/collection.json \
@@ -312,7 +312,7 @@ curl -s $COLL/collection.json \
 
 Reference files in this skill:
 
-- `reference/style-default.json` shows the shape of a published style.
+- `reference/style-default.json` shows the structure of a published style.
 - `reference/map-style.html` loads a style asset and resolves its PMTiles URL. It also switches between styles.
 - `reference/map-inline.html` builds a style inline when the collection provides none. It takes the PMTiles URL and the `source-layer` from the `rel: pmtiles` link.
 - `reference/map-multi.js` draws two collections on one map.
