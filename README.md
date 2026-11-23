@@ -107,6 +107,7 @@ If your agent supports Agent Skills, install the skill directories in its docume
 
 | Skill | What it does |
 |---|---|
+| [`automated-catalog-updates`](skills/automated-catalog-updates/SKILL.md) | Set up automated updates for a Portolan catalog that mirrors a source that changes regularly. |
 | [`catalog-grader`](skills/catalog-grader/SKILL.md) | Grade a published Portolan catalog from A+ to F and explain each finding with evidence. |
 | [`customize-portolan-browser`](skills/customize-portolan-browser/SKILL.md) | Adapt a portolan-browser checkout into a publisher-branded interface for one existing Portolan catalog. |
 | [`enrich-metadata`](skills/enrich-metadata/SKILL.md) | Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. |
