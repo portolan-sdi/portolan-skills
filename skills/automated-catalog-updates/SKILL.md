@@ -15,25 +15,33 @@ Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-
 
 ## Reference implementations
 
-phl-housing-demo and pergamino-ide-catalog built this pattern independently and reached the same design. Read the one closer to your source before you write code. Each has a `docs/refresh.md` that explains every step and every failure.
+phl-housing-demo and pergamino-ide-catalog mirror layers that the publisher edits in place. They built the same design independently, and each has a `docs/refresh.md` that explains every step and every failure. firms-catalog mirrors a stream that only grows. See [Append-only streams](#append-only-streams). Read the catalog closest to your source before you write code.
 
 | Catalog | Source | Schedule |
 |---|---|---|
 | [phl-housing-demo](https://github.com/nlebovits/phl-housing-demo) | ArcGIS FeatureServer layers | Daily |
 | [pergamino-ide-catalog](https://github.com/nlebovits/pergamino-ide-catalog) | GeoNode, with features from its WFS | Weekly |
+| [firms-catalog](https://github.com/portolan-mirrors/firms-catalog) | NASA FIRMS fire detections, an append-only stream | Hourly window, daily merge |
 
 The tools in both are plain Python scripts under `tools/`. Copy what fits. The parts that differ by source are the probe and the cadence lookup. The rest is shared.
 
 ## Compute for the job
 
-This is the open question. Both reference catalogs run on a free GitHub-hosted runner. That works while the largest collection fits on one runner in one job.
+This is the open question. phl-housing-demo, pergamino-ide-catalog, and firms-catalog each run on a free GitHub-hosted runner. That works while the largest unit of work fits on one runner in one job.
 
 | Option | Status | Fits |
 |---|---|---|
-| [GitHub-hosted runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), public repository | Used by both reference catalogs | One collection's source download, GeoParquet, PMTiles, and archived version fit in 14 GB of disk and 16 GB of memory, within the [job time limit](https://docs.github.com/en/actions/reference/limits). A private repository gets 2 CPUs and 8 GB of memory |
+| [GitHub-hosted runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), public repository | Used by all three reference catalogs | One collection's source download, GeoParquet, PMTiles, and archived version fit in 14 GB of disk and 16 GB of memory, within the [job time limit](https://docs.github.com/en/actions/reference/limits). A private repository gets 2 CPUs and 8 GB of memory |
 | Larger GitHub runner | Not tried | More disk, memory, and CPU on the same workflow. Paid |
 | Self-hosted runner | Not tried | The same workflow on a machine you control. You maintain the machine |
 | Cloud batch job, started by a cloud scheduler | Not tried | Large extracts. The job can run in the bucket's region and avoid egress charges. The workflow logic moves out of GitHub Actions |
+
+firms-catalog splits large work into small units that each fit on a free runner:
+
+* One year of detections is about 1 GB of GeoParquet and 1.3 GB of PMTiles. The year build peaks at about 3 GB of disk and has a 300-minute timeout.
+* The historical backfill is about 24 hours of API calls. A matrix runs one sensor-year per job, and each job averages 26 minutes, inside the 6-hour job limit. The jobs run one at a time, because the API rate limit applies to the key across all jobs.
+* The backfill jobs get no cloud credentials. They pass their output to a short publish job as workflow artifacts. A Source Cooperative session token expires long before a 24-hour run ends.
+* Later jobs read the published data back from the bucket, one year at a time. The full archive is 9 GB, and a runner has 14 GB of disk.
 
 Measure before you choose. Run the extract of the largest collection by hand, and record the time, the peak disk use, and the peak memory. Tippecanoe and the archive download often need more disk than the extract itself.
 
@@ -43,7 +51,7 @@ GitHub disables a scheduled workflow in a public repository after 60 days with n
 
 ## Steps in each run
 
-The script walks every collection in a source list (`tools/sources.json` in both catalogs):
+For a layer that the publisher edits in place, the script walks every collection in a source list (`tools/sources.json` in phl-housing-demo and pergamino-ide-catalog):
 
 1. **Probe** the source. One request reads the time of the last edit, and one reads the row count. See [Source signals](#source-signals).
 2. **Decide** whether the collection is due. See [Due collections](#due-collections). Most runs extract nothing.
@@ -58,6 +66,19 @@ The script walks every collection in a source list (`tools/sources.json` in both
 
 A collection that fails at any step rolls back. Its folder and its staged files return to their state before the run. The other collections still publish. The job then fails and opens an issue, or comments on the open one.
 
+## Append-only streams
+
+Some sources only add rows. Fire detections, sensor readings, and event feeds never edit a past row. A full re-extract of such a source grows without limit, and a content hash gives no benefit. firms-catalog uses a different layout:
+
+* Partition the collection by year (`year=<Y>/`). A finished year never changes, so its files and tiles are built once.
+* An hourly job rewrites one small file, `year=<Y>/live.parquet`, from the source's rolling recent window. The hourly upload is about 34 MB instead of the whole year.
+* A daily job merges the window into the year's `detections.parquet` and rebuilds that year's tiles.
+* The hourly job commits nothing to git. It regenerates the extents, the row counts, and `updated`, and uploads them. Git stores only the stable catalog definition.
+
+The window moves forward and the archive does not. When the hourly job stops for longer than the window, rows age out of the feed before any file stores them. Every job still passes, and the total row count still climbs. This happened once: the hourly job failed from 2026-09-16 to 2026-09-21, and 42 hours of detections left the feed. Before each merge, firms-catalog now checks every hour of the year against the archive and the window. It refetches each missing hour from the source's API, and it fails the run when a refetch returns no data for a missing hour.
+
+A job that commits nothing gives GitHub no repository activity. Check the 60-day schedule rule in [Compute for the job](#compute-for-the-job).
+
 ## Source signals
 
 The probe must be cheap. A job that probes a thousand layers daily cannot extract each one to find out whether it changed.
@@ -65,6 +86,7 @@ The probe must be cheap. A job that probes a thousand layers daily cannot extrac
 | Source | Edit signal | Count signal | Cadence | Known traps |
 |---|---|---|---|---|
 | ArcGIS FeatureServer | `editingInfo.dataLastEditDate` on the layer's `?f=json` | `query?where=1=1&returnCountOnly=true` | None in the service. Look for a cadence on the publisher's open data page, such as the "Update Frequency" field on OpenDataPhilly | `lastEditDate` also moves on a schema edit. Use `dataLastEditDate`, and fall back to `lastEditDate` only when the first is absent. A layer with edit tracking off has no `editingInfo`. ArcGIS Online throttles bursts, so retry with a growing pause. |
+| NASA FIRMS | None. The bulk CSV feeds are regenerated on a schedule. On 2026-09-07 they were 20 to 29 minutes old, and detections appeared about 2 h 37 min after observation | Not used | The feed's own schedule. firms-catalog runs hourly | The bulk CSV feeds need no API key and cost no API calls. The area API needs a key and limits each key to 5,000 transactions per 10 minutes. A whole-globe one-day request costs 36 |
 | GeoNode | `last_updated` from `/api/v2/datasets` | WFS `GetFeature` with `resultType=hits` | `maintenance_frequency` on the dataset record | GeoNode moves `last_updated` only when a save goes through GeoNode. An edit made directly in the database behind GeoServer leaves it unchanged. Treat a changed count as a change too, and rely on the row hash for the rest. GeoServer ignores `srsName=EPSG:4326` for a layer whose CRS list lacks it, and answers in the native CRS. Check the CRS the extract declares. |
 
 No other source type has a reference implementation yet. CKAN, Socrata, plain WFS, and OGC API Features each expose different signals, and some expose none. When a source has no edit signal, compare the row count and the row hash on every run. Report what you learn about a new source so it can join this table.
