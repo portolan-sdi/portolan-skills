@@ -1,15 +1,15 @@
 ---
-name: scheduled-reextraction
-description: Script the automatic re-extraction of a Portolan mirror whose source changes regularly. CI or cron runs the scripts on a schedule, and no agent takes part after setup. Each run re-extracts only the collections whose source changed and publishes each change as a new version. Work in progress, and the place to run large extracts is still open. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to update itself.
+name: automated-catalog-updates
+description: Set up automated updates for a Portolan catalog that mirrors a source that changes regularly. CI or cron runs the scripts on a schedule, and no agent takes part after setup. Each run re-extracts only the collections whose source changed and publishes each change as a new version. Work in progress, and the place to run large extracts is still open. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to update itself.
 ---
 
 <!-- drift: depends-on: portolan-cli, portolan-spec -->
 
-# Scheduled re-extraction
+# Automated catalog updates
 
 > **This skill is a work in progress.** Each source type in this skill has exactly one reference catalog behind it, and a new source can break any step. Report a step that fails for your source, a source behavior this page omits, a place you ran the job, or a better signal. A pull request against this skill is the most useful report. An issue in [portolan-skills](https://github.com/portolan-sdi/portolan-skills/issues) also helps.
 
-A mirror matches its source on the day of the extract, and the source changes after that. This skill sets up scripted re-extraction: a set of scripts plus a scheduled job that runs them. You write both once. After that, CI or cron runs the job, and no agent or person takes part. Each run re-extracts only the collections whose source changed. Each change becomes a new version, and the earlier versions remain in the bucket unchanged.
+A mirror matches its source on the day of the extract, and the source changes after that. This skill sets up automated updates: a set of scripts plus a scheduled job that runs them. You write both once. After that, CI or cron runs the job, and no agent or person takes part. Each run re-extracts only the collections whose source changed. Each change becomes a new version, and the earlier versions remain in the bucket unchanged.
 
 Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-backed-catalog` skill puts its metadata in a repository with CI. The scheduled job runs in that repository and commits each new version to git.
 
@@ -119,7 +119,7 @@ The asset named after the collection is the current version. Its URL never chang
 
 Never overwrite an object under `versions/`, and upload every archive before you replace any current file. With that order, a failed upload cannot lose the only copy of a version. A checksum mismatch on the archived file means that another process wrote to the bucket, and you must find that process before you continue.
 
-When you set up scheduled re-extraction, report what the layout cost you on #1131. The maintainers use that issue to choose the Portolan model.
+When you set up automated updates, report what the layout cost you on #1131. The maintainers use that issue to choose the Portolan model.
 
 ## Dates in the metadata
 

@@ -107,6 +107,7 @@ If your agent supports Agent Skills, install the skill directories in its docume
 
 | Skill | What it does |
 |---|---|
+| [`automated-catalog-updates`](skills/automated-catalog-updates/SKILL.md) | Set up automated updates for a Portolan catalog that mirrors a source that changes regularly. |
 | [`catalog-grader`](skills/catalog-grader/SKILL.md) | Grade a published Portolan catalog from A+ to F and explain each finding with evidence. |
 | [`customize-portolan-browser`](skills/customize-portolan-browser/SKILL.md) | Adapt a portolan-browser checkout into a publisher-branded interface for one existing Portolan catalog. |
 | [`enrich-metadata`](skills/enrich-metadata/SKILL.md) | Fill a collection's metadata.yaml from the open data portal record that lists the same data, when the data came from a source with no metadata of its own, such as a Carto table, a file download, an HDX file, or a Socrata dataset. |
@@ -118,7 +119,6 @@ If your agent supports Agent Skills, install the skill directories in its docume
 | [`reading-portolan`](skills/reading-portolan/SKILL.md) | Use when exploring, querying, analyzing, or visualizing data from a Portolan catalog (STAC-based cloud-native geospatial data). |
 | [`register-catalog`](skills/register-catalog/SKILL.md) | Submit a Portolan catalog to the registry by following the registry README. |
 | [`report-catalog-issue`](skills/report-catalog-issue/SKILL.md) | Report a problem with a catalog registered in the Portolan registry by opening a catalog feedback issue against it. |
-| [`scheduled-reextraction`](skills/scheduled-reextraction/SKILL.md) | Script the automatic re-extraction of a Portolan mirror whose source changes regularly. |
 | [`sourcecoop`](skills/sourcecoop/SKILL.md) | Upload geospatial data to Source Cooperative with proper metadata and READMEs using Portolan CLI. |
 <!-- END GENERATED: skills -->
 

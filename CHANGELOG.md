@@ -7,8 +7,8 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- [`scheduled-reextraction`](skills/scheduled-reextraction/SKILL.md) sets up
-  scripted re-extraction of a mirror on a schedule in CI or cron. Each run
+- [`automated-catalog-updates`](skills/automated-catalog-updates/SKILL.md) sets
+  up automated updates of a mirror on a schedule in CI or cron. Each run
   re-extracts only the collections whose source changed. The skill is a
   work in progress. It replaces the proposed upstream sync commands
   (portolan-cli #492 and #546).
