@@ -398,7 +398,7 @@ Fill in `providers`, `source_url`, and `processing_notes` in `.portolan/metadata
 
 Both paths then run through research, documentation, styles, and quality control before any push. `portolan push --dry-run` previews the upload.
 
-Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperative, which is the common case, and the `git-backed-catalog` skill when the metadata belongs in a repository. After publishing, use the `register-catalog` skill to add the catalog to the registry. When the source changes after publication, use the `refresh-catalog` skill to re-extract the changed collections on a schedule.
+Destination setup is delegated. Use the `sourcecoop` skill for Source Cooperative, which is the common case, and the `git-backed-catalog` skill when the metadata belongs in a repository. After publishing, use the `register-catalog` skill to add the catalog to the registry. When the source changes after publication, use the `scheduled-reextraction` skill to script its re-extraction in CI.
 
 Check two settings before the first push to a bucket the user controls. On Source Cooperative, follow the `sourcecoop` skill instead.
 

@@ -1,17 +1,17 @@
 ---
-name: refresh-catalog
-description: Re-extract a mirrored Portolan catalog from its live source on a schedule. Probe each source with two small requests, re-extract only the collections whose source changed, publish each change as a new version, and run the refresh in CI. Work in progress. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to follow its source, or asks how to detect upstream changes.
+name: scheduled-reextraction
+description: Script the automatic re-extraction of a Portolan mirror whose source changes regularly. CI or cron runs the scripts on a schedule, and no agent takes part after setup. Each run re-extracts only the collections whose source changed and publishes each change as a new version. Work in progress, and the place to run large extracts is still open. Use when someone wants a mirror of an ArcGIS, GeoNode, WFS, or similar service to update itself.
 ---
 
 <!-- drift: depends-on: portolan-cli, portolan-spec -->
 
-# Refresh a mirrored catalog
+# Scheduled re-extraction
 
-> **This skill is a work in progress.** Each source type in this skill has exactly one reference catalog behind it, and a new source can break any step. Report a step that fails for your source, a source behavior this page omits, or a better signal. A pull request against this skill is the most useful report. An issue in [portolan-skills](https://github.com/portolan-sdi/portolan-skills/issues) also helps. Use the pattern with care, and check each step against the source in front of you.
+> **This skill is a work in progress.** Each source type in this skill has exactly one reference catalog behind it, and a new source can break any step. Report a step that fails for your source, a source behavior this page omits, a place you ran the job, or a better signal. A pull request against this skill is the most useful report. An issue in [portolan-skills](https://github.com/portolan-sdi/portolan-skills/issues) also helps.
 
-A mirror matches its source on the day of the build. The source changes after that. In this skill, a scheduled job probes each source and extracts only the collections that changed. Each change becomes a new version, and the earlier versions remain in the bucket unchanged.
+A mirror matches its source on the day of the extract, and the source changes after that. This skill sets up scripted re-extraction: a set of scripts plus a scheduled job that runs them. You write both once. After that, CI or cron runs the job, and no agent or person takes part. Each run re-extracts only the collections whose source changed. Each change becomes a new version, and the earlier versions remain in the bucket unchanged.
 
-Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-backed-catalog` skill puts its metadata in a repository with CI. This skill adds the refresh on top of both. It assumes that git stores the metadata, because git records every version that the refresh publishes.
+Build the catalog first. The `portolan-bootstrap` skill builds it, and the `git-backed-catalog` skill puts its metadata in a repository with CI. The scheduled job runs in that repository and commits each new version to git.
 
 ## Reference implementations
 
@@ -24,9 +24,26 @@ phl-housing-demo and pergamino-ide-catalog built this pattern independently and 
 
 The tools in both are plain Python scripts under `tools/`. Copy what fits. The parts that differ by source are the probe and the cadence lookup. The rest is shared.
 
-## The refresh, step by step
+## Compute for the job
 
-Each run walks every collection in a source list (`tools/sources.json` in both catalogs):
+This is the open question. Both reference catalogs run on a free GitHub-hosted runner. That works while the largest collection fits on one runner in one job.
+
+| Option | Status | Fits |
+|---|---|---|
+| [GitHub-hosted runner](https://docs.github.com/en/actions/reference/runners/github-hosted-runners), public repository | Used by both reference catalogs | One collection's source download, GeoParquet, PMTiles, and archived version fit in 14 GB of disk and 16 GB of memory, within the [job time limit](https://docs.github.com/en/actions/reference/limits). A private repository gets 2 CPUs and 8 GB of memory |
+| Larger GitHub runner | Not tried | More disk, memory, and CPU on the same workflow. Paid |
+| Self-hosted runner | Not tried | The same workflow on a machine you control. You maintain the machine |
+| Cloud batch job, started by a cloud scheduler | Not tried | Large extracts. The job can run in the bucket's region and avoid egress charges. The workflow logic moves out of GitHub Actions |
+
+Measure before you choose. Run the extract of the largest collection by hand, and record the time, the peak disk use, and the peak memory. Tippecanoe and the archive download often need more disk than the extract itself.
+
+A source with millions of rows may be too slow to extract in full on every change. Some ArcGIS layers have a per-row edit date field, and a query on that field returns only the changed rows. No reference catalog does incremental extraction yet. A merge of changed rows into the current GeoParquet needs a stable row key from the source.
+
+GitHub disables a scheduled workflow in a public repository after 60 days with no repository activity. The job commits only when a source changes. A quiet source can let the schedule lapse. Watch for it, or give the job a reason to commit.
+
+## Steps in each run
+
+The script walks every collection in a source list (`tools/sources.json` in both catalogs):
 
 1. **Probe** the source. One request reads the time of the last edit, and one reads the row count. See [Source signals](#source-signals).
 2. **Decide** whether the collection is due. See [Due collections](#due-collections). Most runs extract nothing.
@@ -34,7 +51,7 @@ Each run walks every collection in a source list (`tools/sources.json` in both c
 4. **Compare** an order-independent hash of every row with the current version. Equal rows mean the source touched nothing that matters. Record the check and publish nothing. See [Skip versions that change nothing](#skip-versions-that-change-nothing).
 5. **Check the styles** against the new rows. A styled column that is gone, a category that held rows and now holds none, or a new value with no category holds the collection back. The `portolan-bootstrap` skill explains [why every legend entry must match the data](../portolan-bootstrap/SKILL.md#the-legend-rule).
 6. **Archive** the outgoing current file. Download it from the bucket, check it against the `file:checksum` in `collection.json`, and stage it as an earlier version. See [Versions](#versions).
-7. **Record** the new version in `collection.json`, write the new GeoParquet and PMTiles, and render a new thumbnail with the `portolan-thumbnails` skill. A render that fails the blank check keeps the previous image.
+7. **Record** the new version in `collection.json`, write the new GeoParquet and PMTiles, and render a new thumbnail. pergamino-ide-catalog renders with chiitiler, the renderer that the `portolan-thumbnails` skill documents. A render that fails the blank check keeps the previous image.
 8. **Gate** the result with the same checks CI runs on a pull request. The `git-backed-catalog` skill covers [the documented-query checks](../git-backed-catalog/SKILL.md#test-the-documented-queries-and-claims).
 9. **Publish** the archives first and the new data next. Upload the metadata last. Then run every documented query against the bucket.
 10. **Commit** the published metadata to the default branch from a separate job.
@@ -43,7 +60,7 @@ A collection that fails at any step rolls back. Its folder and its staged files 
 
 ## Source signals
 
-The probe must be cheap. A refresh that probes a thousand layers daily cannot extract each one to find out whether it changed.
+The probe must be cheap. A job that probes a thousand layers daily cannot extract each one to find out whether it changed.
 
 | Source | Edit signal | Count signal | Cadence | Known traps |
 |---|---|---|---|---|
@@ -102,7 +119,7 @@ The asset named after the collection is the current version. Its URL never chang
 
 Never overwrite an object under `versions/`, and upload every archive before you replace any current file. With that order, a failed upload cannot lose the only copy of a version. A checksum mismatch on the archived file means that another process wrote to the bucket, and you must find that process before you continue.
 
-When you build a refresh, report what the layout cost you on #1131. The maintainers use that issue to choose the Portolan model.
+When you set up scheduled re-extraction, report what the layout cost you on #1131. The maintainers use that issue to choose the Portolan model.
 
 ## Dates in the metadata
 
@@ -112,7 +129,7 @@ Set the root catalog's `updated` to the newest collection `updated` below it.
 
 ## Numbers and dates in the documentation
 
-Each refresh changes the data, but nothing rewrites the prose. A phrase such as "29,198 parcels" or "extracted 2026-08-26" in a README is wrong after the next version.
+Each re-extraction changes the data, but nothing rewrites the prose. A phrase such as "29,198 parcels" or "extracted 2026-08-26" in a README is wrong after the next version.
 
 * Quote no numbers measured from the data. Point to `table:row_count` in `collection.json` and give a query.
 * Name no extraction date. Point to the version list in `collection.json`. A sentence about the first version may keep its date, because the first version never changes.
@@ -121,10 +138,10 @@ Enforce both rules with tests that run before every upload. The reference catalo
 
 ## The scheduled workflow
 
-Both reference catalogs run the refresh as a GitHub Actions workflow, `.github/workflows/refresh.yml`.
+Both reference catalogs run the scripts as a GitHub Actions workflow, `.github/workflows/refresh.yml`.
 
 * **Schedule** the run after the publisher's working day, so it sees the full previous day of edits. Check when edits arrive before you pick a time.
-* **Allow one writer.** The refresh and the metadata publish workflow share a concurrency group, so they never run at once.
+* **Allow one writer.** The scheduled job and the metadata publish workflow share a concurrency group, so they never run at once.
 * **Request credentials late.** Sign in after the extract. The short-lived token then covers only the upload. Use the provider's workload identity federation. Store no key. Both reference catalogs document the Source Cooperative setup in the Credentials section of their `docs/refresh.md`.
 * **Separate the commit.** A second job with `contents: write` and no cloud credentials commits the published metadata. A run that published and then failed to commit leaves the bucket ahead of git. The publish workflow must detect that and stop.
 * **Report failures.** A third job opens one issue for a failed run, or comments on the open one.
@@ -141,7 +158,7 @@ Never add a dataset to the catalog because it appeared at the source. A public p
 | The probe fails | Skip the collection. The next run retries |
 | The row count moved during the extract | Discard the extract. The next run retries |
 | The new rows break a style | Hold the collection back. Fix the style against the new rows, then rerun that collection |
-| The archived file does not match its checksum | Stop. Something outside the refresh wrote to the bucket |
+| The archived file does not match its checksum | Stop. Something outside the scheduled job wrote to the bucket |
 | The bucket holds a version that is missing from git | A run published and failed to commit. Commit the run's saved metadata, then rerun |
 | The source has no edit signal | Compare the row count and the row hash on every run |
 | A step in this skill fails for your source | Open a pull request against this skill |

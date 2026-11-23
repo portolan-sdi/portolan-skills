@@ -7,11 +7,11 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- [`refresh-catalog`](skills/refresh-catalog/SKILL.md) keeps a mirrored
-  catalog current with its live source. It probes each source, extracts
-  only what changed, and publishes each change as a new version. The
-  skill is a work in progress. It replaces the proposed upstream sync
-  commands (portolan-cli #492 and #546).
+- [`scheduled-reextraction`](skills/scheduled-reextraction/SKILL.md) sets up
+  scripted re-extraction of a mirror on a schedule in CI or cron. Each run
+  re-extracts only the collections whose source changed. The skill is a
+  work in progress. It replaces the proposed upstream sync commands
+  (portolan-cli #492 and #546).
 - `git-backed-catalog` adds CI checks for documented queries and claims (#33).
 - [`catalog-grader`](skills/catalog-grader/SKILL.md) grades catalog quality
   with evidence. Its [rubric](skills/catalog-grader/reference/rubric.md)
