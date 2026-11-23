@@ -45,7 +45,7 @@ If the script exits 1, stop. The catalog is not in the registry, so there is nob
 
 ## Step 2: Run the check that shows the problem
 
-The report is worth nothing without evidence. Run a command against the live catalog and keep both the command and its output.
+A report without evidence is of no use. Run a command against the live catalog and keep both the command and its output.
 
 `rashid check` accepts a local path or published HTTPS URL and cites spec rule IDs in its findings. Inside a catalog managed by the CLI, use `portolan check`.
 

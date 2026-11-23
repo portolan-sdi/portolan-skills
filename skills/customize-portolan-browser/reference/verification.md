@@ -81,7 +81,7 @@ Cover these when the catalog contains them:
 
 - The homepage hierarchy, the navigation, the filters, and the search.
 - Populated and empty topic, department, and tag states.
-- Direct links. A filtered view should carry its selection in the URL and reload the same.
+- Direct links. A filtered view should store its selection in the URL and reload the same.
 - License, provenance, documentation, and download affordances.
 - Footer provenance. The footer must link to the data and to the publisher. It must also
   link to the source code.
@@ -112,7 +112,7 @@ Cover these when the catalog contains them:
 
 ## Report by owner
 
-Sort every finding into one of three lists. Name the affected route, collection, asset, or
+Sort every finding into one of three lists. State the affected route, collection, asset, or
 interface state, and describe what you observed.
 
 1. **Custom browser changes**, implemented in this repository.

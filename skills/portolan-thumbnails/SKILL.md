@@ -8,8 +8,8 @@ description: Generate framed, checked thumbnails from Portolan collections using
 # Framed Thumbnails with Chiitiler
 
 Render a collection's default style server-side with
-[chiitiler](https://github.com/Kanahiro/chiitiler), frame it to the shape of the
-browser card, and check the result before you publish it. The renderer is the
+[chiitiler](https://github.com/Kanahiro/chiitiler), frame it to the aspect ratio of
+the browser card, and check the result before you publish it. The renderer is the
 easy half.
 Most bad thumbnails come from the bbox.
 
@@ -45,8 +45,8 @@ describes the CLI's own thumbnail as guidance, not conformance.
 
 `read_collection.py` reads the signals from `collection.json` by role and by link
 relation, never by file name. Styles are assets with the `style` role, and the
-default one also carries `default` (PORTO-CORE-069, PORTO-CORE-070). The PMTiles
-is a `rel: pmtiles` link with `pmtiles:layers` (PORTO-FMT-011).
+default one also has the `default` role (PORTO-CORE-069, PORTO-CORE-070). The
+PMTiles is a `rel: pmtiles` link with `pmtiles:layers` (PORTO-FMT-011).
 
 ```bash
 python3 "$SKILL/scripts/read_collection.py" publico_arbolado/
@@ -135,7 +135,7 @@ python3 "$SKILL/scripts/frame.py" --center -60.581959,-33.893888 \
 #  "zoom": 15.0, ... "strategy": "B"}
 ```
 
-Zoom governs how much ground the window covers. At `--size 1024` the longest
+Zoom sets how much ground the window covers. At `--size 1024` the longest
 framed edge runs 78.3 km at zoom 11, 39.1 at 12, 19.6 at 13, 9.8 at 14, 4.9 at 15,
 2.4 at 16, and 1.2 at 17.
 
@@ -149,7 +149,7 @@ grid shows.
 ### Finding a Dense Cluster
 
 Try the header centre first. When it is a bbox corner, or when the collection has
-several distinct clusters, use DuckDB. GeoParquet 1.1 files carry a `bbox` struct
+several distinct clusters, use DuckDB. GeoParquet 1.1 files have a `bbox` struct
 column, so no spatial extension is needed.
 
 ```sql
@@ -343,7 +343,7 @@ bash "$SKILL/scripts/pick_basemap.sh" --list   # probe every candidate
 bash "$SKILL/scripts/pick_basemap.sh"          # print the first that works
 ```
 
-The result is cached in `$WORK/basemap.url`, so a batch probes once. When no
+Because the result is cached in `$WORK/basemap.url`, a batch probes once. When no
 candidate answers, the render falls back to a white background, which reads
 better than a watermark.
 
@@ -364,7 +364,7 @@ prohibits systematic or bulk downloading, and a catalog of a few dozen
 collections is bulk. It is a usable fallback for one or two images, not a
 default for a batch. Send a real `User-Agent` if you use it.
 
-Credit whichever basemap you render. Esri's canvas services carry their own
+Credit whichever basemap you render. Esri's canvas services include their own
 attribution, and OpenStreetMap requires crediting its contributors. The
 catalog README is the right place for that line.
 

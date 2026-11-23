@@ -84,7 +84,7 @@ View each saved thumbnail before grading it.
 
 - **A.**
   - Each geospatial collection has a thumbnail that passes the six questions in the [portolan-thumbnails visual gate](../../portolan-thumbnails/SKILL.md#gate-2-visual).
-  - Each collection with attributes worth showing has several data-driven styles, with one marked `default`.
+  - Each collection with attributes that a reader would want on a map has several data-driven styles, with one marked `default`.
   - Each `match` label exists in the data (`legend_checks`).
   - Default palettes differ across sibling collections.
   - Across the catalog, three or more visualizations show different aspects of the data, unless the data is only geometry.
@@ -114,7 +114,7 @@ Check whether the text helps readers use the data. A long list of real quirks is
 
 - **A.** Each document states each fact once. `AGENTS.md` does not repeat extents, licenses, or row counts from the JSON. The docs contain no filler, hype, or boilerplate copied across collections (`agents_similarity`).
 - **B.** Some text adds no useful information, or sections repeat across collections.
-- **D.** Most collection docs are near copies of each other (similarity 0.9 or more), or padding buries the useful content.
+- **D.** Most collection docs are near copies of each other (similarity 0.9 or more), or padding makes the useful content hard to find.
 
 ## A requirements
 

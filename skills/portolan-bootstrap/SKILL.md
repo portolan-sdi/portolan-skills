@@ -59,11 +59,11 @@ Research widely. Then make each claim traceable. A fact belongs in the catalog w
 
 Anything else is invention, including the plausible kind. Guessing that pipe-material code 109 means ductile iron is invention. Finding the utility's code list and citing it is research. Reporting that 109 is the most common value is derivation.
 
-When research fails, say so. "The publisher has not released a code list for `MATERIAL`. The values are opaque integers" is honest and useful. A column left undescribed is a smaller failure than a column described wrongly. Record such gaps in `known_issues` in `.portolan/metadata.yaml`.
+When research fails, say so. "The publisher has not released a code list for `MATERIAL`. The values are opaque integers" is accurate and useful. A column left undescribed is a smaller failure than a column described wrongly. Record such gaps in `known_issues` in `.portolan/metadata.yaml`.
 
 ### Provenance fields
 
-The spec derives whether a catalog is official or a mirror from `providers`. Every collection MUST list `providers` with at least one `producer` and exactly one `host`, listed last (PORTO-CORE-046, PORTO-CORE-047). The host MUST carry a `url` or an `email` (PORTO-CORE-051). When producer and host differ, the collection is a mirror. A mirror MUST carry a `via` link of type `text/html` to the original source (PORTO-CORE-053) and a top-level `updated` field set to the time of the sync (PORTO-CORE-057).
+The spec derives whether a catalog is official or a mirror from `providers`. Every collection MUST list `providers` with at least one `producer` and exactly one `host`, listed last (PORTO-CORE-046, PORTO-CORE-047). The host MUST have a `url` or an `email` (PORTO-CORE-051). When producer and host differ, the collection is a mirror. A mirror MUST have a `via` link of type `text/html` to the original source (PORTO-CORE-053) and a top-level `updated` field set to the time of the sync (PORTO-CORE-057).
 
 Declare the providers and the source in `.portolan/metadata.yaml`. The CLI writes the `via` link from `source_url` and sets `updated` when the providers make the collection a mirror. `portolan extract` also writes a `via` link on each collection it creates.
 
@@ -95,7 +95,7 @@ Translation is checkpointed too. Do not translate a title or description unless 
 
 ## Research the Data Before You Convert It
 
-Do this before extraction. What you learn here decides which datasets are worth mirroring. It also decides which columns need decoding and which styles will say anything.
+Do this before extraction. What you learn here decides which datasets to mirror. It also decides which columns need decoding and which styles will say anything.
 
 Work these targets in order.
 
@@ -107,7 +107,7 @@ Work these targets in order.
 curl -s "<SERVICE_URL>/0?f=json" | jq '.fields'
 ```
 
-Field aliases and `domains` carry the coded-value lists that decode integer columns. For WFS, read the capabilities and schema documents:
+Field aliases and `domains` contain the coded-value lists that decode integer columns. For WFS, read the capabilities and schema documents:
 
 ```bash
 curl -s "<WFS_URL>?service=WFS\
@@ -222,7 +222,7 @@ Do not link a collection description to itself.
 
 ### README.md
 
-Generated output, never hand-edited. Edit `.portolan/metadata.yaml` and regenerate with `portolan readme`. A hand-edited README is replaced on the next run. The README MUST carry a title, description, license, and data provenance (PORTO-CORE-063). The provenance section comes from `source_url` and `processing_notes`.
+Generated output, never hand-edited. Edit `.portolan/metadata.yaml` and regenerate with `portolan readme`. A hand-edited README is replaced on the next run. The README MUST contain a title, description, license, and data provenance (PORTO-CORE-063). The provenance section comes from `source_url` and `processing_notes`.
 
 ### AGENTS.md
 
@@ -293,7 +293,7 @@ GROUP BY category
 ORDER BY 2 DESC;
 ```
 
-Every branch in the `match` should appear in that result, and every populated category worth showing should appear in the `match`.
+Every branch in the `match` should appear in that result, and every populated category that a reader needs to see should appear in the `match`.
 
 ### Checkpoint: Style Plan
 
@@ -304,10 +304,10 @@ Per collection, present the proposed styles, the column each uses, the distribut
 A reader who wants the authoritative original should not have to leave the catalog and search for it. A reader checking your work needs to see what you started from. Each carried asset has a role that says what it is:
 
 * The upstream download you converted from has the `source` role when it is directly downloadable (PORTO-FMT-002). Link it at its original location. You do not need to rehost it, and its format is exempt from the format rules (PORTO-FMT-045).
-* Sidecar metadata such as FGDC XML or a data dictionary PDF carries the `metadata` role. An ISO 19115 file carries `iso-19115` (PORTO-CORE-027, PORTO-FMT-003).
-* A publisher logo is not an asset. Publish it with `portolan logo <file>`, which writes a root `rel: icon` link (PORTO-CORE-074). Only do this when the user confirms the catalog may carry the publisher's branding.
+* Sidecar metadata such as FGDC XML or a data dictionary PDF has the `metadata` role. An ISO 19115 file has the `iso-19115` role (PORTO-CORE-027, PORTO-FMT-003).
+* A publisher logo is not an asset. Publish it with `portolan logo <file>`, which writes a root `rel: icon` link (PORTO-CORE-074). Only do this when the user confirms the catalog may show the publisher's branding.
 
-Give each carried asset a title that says what it is and where it came from, so the asset list reads as a provenance record rather than a list of filenames.
+Give each carried asset a title that says what it is and where it came from. The asset list then reads as a provenance record rather than a list of filenames.
 
 When the source is a feature service or a WFS endpoint rather than a file, the `via` link covers the endpoint. Layer selection, pagination, and any bbox filter belong in `processing_notes`.
 
@@ -348,7 +348,7 @@ Check tile weight by opening the PMTiles in [pmtiles.io](https://pmtiles.io) and
 
 A large PMTiles file can still pan slowly once the tiles are tuned. Each tile is a range request to the bucket. Offer the user a CDN in front of the bucket, and set it up from the provider's documentation. The CDN must honor `Range` requests (PORTO-CORE-043) and must not compress or transform the responses.
 
-Then run the validator. Once the catalog is published, run it again with `--live` and pass the published base URL, so the probe covers your host and skips upstream hosts you do not control:
+Then run the validator. Once the catalog is published, run it again with `--live` and pass the published base URL. The probe then covers your host and skips upstream hosts you do not control:
 
 ```bash
 portolan check

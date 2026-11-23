@@ -106,7 +106,7 @@ catalog finding.**
 Card thumbnails come from assets and links that have the `thumbnail` role. The relevant
 options are `defaultThumbnailSize`, `showThumbnailsAsAssets`, and `crossOriginMedia`.
 
-A thumbnail is a designed view. Frame it for the geometry and the card shape. The framing
+A thumbnail is a designed view. Frame it for the geometry and the card's aspect ratio. The framing
 must still come from valid catalog information. A thumbnail that is blank, that is stretched,
 or that shows a bounding box screenshot is a catalog finding. The `portolan-thumbnails` skill
 regenerates them.
