@@ -105,7 +105,7 @@ The template includes `tools/publish.py` but no workflow that runs it. Choose on
 In both modes:
 
 * Do not publish metadata only from a scheduled data refresh. A metadata change then stays out of the bucket until the next refresh finds new data.
-* Get credentials from the store's OpenID Connect (OIDC) exchange when it has one. The repository then holds no long-lived key.
+* Get credentials from the store's OpenID Connect (OIDC) exchange when it has one. The repository then stores no long-lived key.
 * Give the publish job and any refresh job that writes the bucket the same `concurrency` group. The publish job then never overlaps a refresh write.
 * Stop before an upload if the bucket holds a version that git does not. That happens when a refresh publishes and then fails to commit.
 * Run a scheduled check that compares the published metadata with the default branch, and fail it when they differ.
