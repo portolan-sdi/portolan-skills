@@ -9,7 +9,7 @@ description: Use when exploring, querying, analyzing, or visualizing data from a
 
 A Portolan catalog is a STAC catalog served as static files from object storage. Vector data is GeoParquet paired with PMTiles. Raster data is Cloud Optimized GeoTIFF (COG). Tabular data is plain Parquet with no geometry column. There is no API server. You read the JSON, then query the files in place with DuckDB or rasterio.
 
-The [Portolan specification](https://github.com/portolan-sdi/portolan-spec) is ground truth. Read `specs/portolan/core.md` and `specs/portolan/formats.md` at tag v0.2.0 when this skill and a catalog disagree. Rule ids such as `PORTO-CORE-061` point into `specs/portolan/requirements.yaml`.
+The [Portolan specification](https://github.com/portolan-sdi/portolan-spec) is ground truth. Read `specs/portolan/core.md` and `specs/portolan/formats.md` at tag v0.3.0 when this skill and a catalog disagree. Rule ids such as `PORTO-CORE-061` point into `specs/portolan/requirements.yaml`.
 
 ## Step 1: Detect the environment
 
@@ -98,7 +98,7 @@ curl -s $COLL/collection.json | jq '{
 
 Each field reports the following:
 
-- `stac_extensions` contains `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json`. That URI is the only signal of the specification version (PORTO-CORE-006).
+- `stac_extensions` contains `https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json`. That URI is the only signal of the specification version (PORTO-CORE-006).
 - `license` is an SPDX identifier, or `other` with a `rel: license` link (PORTO-CORE-058, PORTO-CORE-059). Report it before you redistribute anything.
 - `providers` lists at least one `producer` and exactly one `host`, last (PORTO-CORE-047). When the producer and the host are the same organization, the catalog is official. When they differ, the catalog is a mirror.
 - A mirror has a `via` link (`text/html`) to the original source (PORTO-CORE-053). It has a `canonical` link when the source publishes its own STAC (PORTO-CORE-054). It sets top-level `updated` to the last sync time (PORTO-CORE-057). Compare `updated` with the source when freshness matters.
@@ -123,7 +123,7 @@ curl -s $COLL/collection.json \
   | jq -r '.assets | to_entries[] | select(.value.roles | index("data")) | .value.href'
 ```
 
-Hrefs are relative to the file that holds them. An absolute asset href uses `https` (PORTO-CORE-023). An asset may add an `s3://` or `gs://` URL under `alternate` (PORTO-CORE-024). Use the `https` href with DuckDB unless you have bucket credentials. Do not rewrite an `https` URL into `s3://` by hand.
+Hrefs are relative to the file that holds them. An absolute asset href should use `https` (PORTO-CORE-023). A non-HTTPS absolute href needs an HTTPS alternate for the same data (PORTO-CORE-087). An asset may add an `s3://` or `gs://` URL under `alternate` (PORTO-CORE-024). Use the `https` href with DuckDB unless you have bucket credentials. Do not rewrite an `https` URL into `s3://` by hand.
 
 ### Asset hrefs and access paths
 
@@ -241,7 +241,7 @@ For other formats use `ogr2ogr`. It reads remote files through `/vsicurl/https:/
 
 A collection with `partition:glob` spreads its rows over several files. The glob is the bulk-access path (PORTO-FMT-019). Copy it as written. Do not build your own pattern from the asset hrefs, because the scheme determines the directory layout.
 
-The glob may use `s3://` or `gs://` even though asset hrefs use `https` (PORTO-FMT-020). Glob expansion needs a bucket listing, and plain `https` cannot list. DuckDB does not expand an `https` glob.
+The glob must be an absolute URL that clients can list (PORTO-FMT-064). Use `s3://`, `gs://`, or `az://` (PORTO-FMT-075). DuckDB does not expand an `https` glob.
 
 ```sql
 -- Public GCS bucket: an anonymous secret is enough.

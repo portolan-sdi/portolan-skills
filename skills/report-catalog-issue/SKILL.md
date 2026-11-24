@@ -50,13 +50,13 @@ A report without evidence is of no use. Run a command against the live catalog a
 `rashid check` accepts a local path or published HTTPS URL and cites spec rule IDs in its findings. Inside a catalog managed by the CLI, use `portolan check`.
 
 ```bash
-uvx --from 'rashid>=0.3.0,<0.4.0' rashid check ./catalog --summary
+uvx --from 'rashid>=0.4.0,<0.5.0' rashid check ./catalog --summary
 ```
 
 For published catalogs, rashid follows links and runs live checks:
 
 ```bash
-uvx --from 'rashid>=0.3.0,<0.4.0' rashid check "$CATALOG_URL" --summary
+uvx --from 'rashid>=0.4.0,<0.5.0' rashid check "$CATALOG_URL" --summary
 ```
 
 Use `curl` and `jq` to show metadata fields, or DuckDB to inspect data.
@@ -86,7 +86,7 @@ Schema
 
 ### What you found
 
-The root catalog declares no `title` and no `stac_extensions`. Both are MUST fields. The registry lists the catalog by its slug and records no Portolan spec version. Add a `title` and the v0.2.0 schema URI to `stac_extensions`.
+The root catalog declares no `title` and no `stac_extensions`. Both are MUST fields. The registry lists the catalog by its slug and records no Portolan spec version. Add a `title` and the v0.3.0 schema URI to `stac_extensions`.
 
 ### How you hit it
 

@@ -3,23 +3,23 @@
 
 [portolan-cli]
 # The PyPI release. `pip install portolan-cli` gives this version.
-version = "0.8.0"
+version = "0.9.0"
 
 [rashid]
-version = "0.3.0"
+version = "0.4.0"
 
 [source-coop-cli]
 # The GitHub release. The Homebrew tap and the installer script give this version.
 version = "v0.3.0"
 
 [portolan-spec]
-tag = "v0.2.0"
+tag = "v0.3.0"
 
 [portolan-catalog-template]
-sha = "12bbc92"
+sha = "ee8601d"
 
 [portolan-registry]
-sha = "bbaecc4"
+sha = "07145db"
 
 [portolan-browser]
-sha = "8a21daf"
+sha = "c418e1b"

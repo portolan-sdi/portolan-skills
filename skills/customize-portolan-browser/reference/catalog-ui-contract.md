@@ -61,12 +61,12 @@ A style source resolves against the style document's own href, so
 The browser decodes each COG in the browser, so the STAC metadata alone sets the color of each
 pixel. `docs/rasters.md` in the browser gives the order of precedence:
 
-1. The `color_hint` of each entry in `classification:classes` on band 1 of the asset.
+1. The `color_hint` of each entry in `classification:classes` on band 1 or on the asset itself. A class with `nodata: true` draws transparent and needs no color hint.
 2. The first render whose `assets` list holds the asset key.
 3. The first declared render, stretched to the band statistics of the asset.
 4. The `viridis` ramp.
 
-When one class lacks a readable `color_hint` or a numeric `value`, the whole asset falls
+When a visible class lacks a readable `color_hint` or a numeric `value`, the whole asset falls
 through to the render rules. A categorical raster in the wrong colors, or in `viridis`, has
 incomplete class hints or no render. **That is a catalog finding.**
 

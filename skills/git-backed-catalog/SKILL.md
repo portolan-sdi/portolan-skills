@@ -56,15 +56,15 @@ These two guards stop you, and both are deliberate:
 
 ### Declare the current schema version
 
-The pinned template declares `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json` in `catalog/catalog.json`. See PORTO-CORE-006, PORTO-CORE-009, and PORTO-CORE-081 for schema and `self` link requirements.
+The pinned template declares `https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json` in `catalog/catalog.json`. Set the URI to `https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json` for a catalog targeting v0.3.0. See PORTO-CORE-006, PORTO-CORE-009, and PORTO-CORE-081 for schema and `self` link requirements.
 
 ### Raise the validator floor in the gate
 
-To use the pinned rashid 0.3.0, update `tests/test_conformance.py`: set `MIN_VERSION = (0, 3, 0)`, `MAX_VERSION = (0, 4, 0)`, and `SPEC = "rashid>=0.3.0,<0.4.0"`. Install the same version locally and in CI:
+To use the pinned rashid 0.4.0, update `tests/test_conformance.py`: set `MIN_VERSION = (0, 4, 0)`, `MAX_VERSION = (0, 5, 0)`, and `SPEC = "rashid>=0.4.0,<0.5.0"`. Install the same version locally and in CI:
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install 'rashid>=0.3.0,<0.4.0'
+.venv/bin/pip install 'rashid>=0.4.0,<0.5.0'
 .venv/bin/rashid --version
 ```
 
@@ -72,7 +72,7 @@ python3 -m venv .venv
 
 Data files do not belong in git. Build them, upload them to the bucket, and write STAC that references them by public URL. The `.gitignore` already blocks common data formats.
 
-Each collection directory contains `collection.json`, `AGENTS.md`, and `README.md` (PORTO-CORE-005). The `AGENTS.md` link is `rel: agents` and the `README.md` link is `rel: describedby`, both `type: text/markdown` (PORTO-CORE-061, PORTO-CORE-062). The root's `child` link has `type: application/json` and a `title` (PORTO-CORE-033, PORTO-CORE-039). An absolute asset href uses `https`, never `s3` (PORTO-CORE-023). Offer the `s3` form through the alternate-assets extension (PORTO-CORE-024).
+Each collection directory contains `collection.json`, `AGENTS.md`, and `README.md` (PORTO-CORE-005). The `AGENTS.md` link is `rel: agents` and the `README.md` link is `rel: describedby`, both `type: text/markdown` (PORTO-CORE-061, PORTO-CORE-062). The root's `child` link has `type: application/json` and a `title` (PORTO-CORE-033, PORTO-CORE-039). An absolute asset href should use `https` (PORTO-CORE-023). A non-HTTPS absolute href needs an HTTPS alternate for the same data (PORTO-CORE-087).
 
 Items are normative. A collection with more than one raster scene models each scene as an item in its own subdirectory (PORTO-CORE-015, PORTO-CORE-071). Commit that item JSON. A collection with many items also publishes `items.parquet`, registered as a collection asset with role `collection-mirror` (PORTO-FMT-040, PORTO-FMT-041). The mirror is derived from the items. It never replaces item JSON or the collection's `item` links (PORTO-FMT-042). Generate the mirror with `portolan stac-geoparquet`, and keep the generator, not only its output, in the repository.
 

@@ -4,21 +4,15 @@
 From microsoft-ml-road-detections (tools/validate_with_data.py). Generalized
 as a reference; edit the constants under "What a new catalog must change".
 
-The published catalog addresses its data with absolute https hrefs and an
-`s3://` `partition:glob`, which is correct (PORTO-FMT-020). It is also why
-the partition checks cannot run locally. Rashid expands only a local relative
-glob against the collection's own directory. A remote or absolute glob cannot
-be listed from the local tree, so rashid reads none of the partitions and the
-run stays clean. That silence is the glob, not `--data-scope`. `--data-scope
-local` only limits the byte checks to assets inside the catalog tree.
+The published catalog keeps its absolute bucket glob (PORTO-FMT-064).
+After publishing, run rashid 0.4.0 against the catalog URL to list the glob
+anonymously and sample partition footers.
 
-This builds a throwaway tree that mirrors the published layout, with the glob
-rewritten to a local relative pattern, the remote hrefs rewritten to local
-ones, and the partitions symlinked rather than copied. It then runs rashid
-over it with the data pass enabled. That is what exercises PTL-DAT-006
-(spatial ordering), 007 (per-row-group statistics), 008 (the 150,000-row cap),
-012 (GeoParquet version) and 014 (one schema across partitions) against real
-bytes. Each rule reports once per collection, at `/partition:glob`.
+This builds a throwaway tree with local hrefs and symlinked partitions.
+rashid 0.4.0 checks every file matched by the local relative glob and
+reports PTL-PRT-002 at /partition:glob because the glob is relative.
+The run requires that finding on the rewritten collection and fails on
+any other error, including data errors.
 
 Checksums still match because the symlinks point at the same files the
 generator measured.
@@ -58,9 +52,8 @@ def localise(tree: Path) -> list[str]:
     doc = json.loads(path.read_text())
     changes = []
 
-    if "partition:glob" in doc:
-        changes.append(f"partition:glob {doc['partition:glob']}")
-        doc["partition:glob"] = f"./{PARTITION_DIR}/{PARTITION_KEY}=*/*.parquet"
+    changes.append(f"partition:glob {doc['partition:glob']}")
+    doc["partition:glob"] = f"./{PARTITION_DIR}/{PARTITION_KEY}=*/*.parquet"
 
     for key, asset in doc.get("assets", {}).items():
         href = asset.get("href", "")
@@ -102,13 +95,42 @@ def main() -> int:
         print(f"\nrunning rashid over {tree} with the data pass enabled")
         print("this reads every partition footer, so it takes a few minutes\n")
         result = subprocess.run(
-            ["rashid", "check", str(tree), "--data-scope", "all"],
+            ["rashid", "check", str(tree), "--data-scope", "all", "--json"],
             capture_output=True,
             text=True,
         )
         sys.stdout.write(result.stdout)
         sys.stderr.write(result.stderr)
-        return result.returncode
+        if result.returncode != 1:
+            print("expected rashid to report a relative-glob error", file=sys.stderr)
+            return 1
+        try:
+            findings = json.loads(result.stdout)["findings"]
+            expected = []
+            other_errors = []
+            collection = tree / COLLECTION / "collection.json"
+            for finding in findings:
+                if finding["rule_id"] == "PTL-PRT-002":
+                    path = Path(finding["path"])
+                    if (
+                        finding["severity"] == "error"
+                        and finding.get("json_pointer") == "/partition:glob"
+                        and (tree / path).resolve() == collection.resolve()
+                    ):
+                        expected.append(finding)
+                        continue
+                    print("unexpected PTL-PRT-002 finding", file=sys.stderr)
+                    return 1
+                if finding["severity"] == "error":
+                    other_errors.append(finding)
+        except (ValueError, KeyError, TypeError) as exc:
+            print(f"invalid rashid JSON report: {exc}", file=sys.stderr)
+            return 1
+
+        if len(expected) != 1:
+            print("expected one PTL-PRT-002 at the rewritten glob", file=sys.stderr)
+            return 1
+        return 1 if other_errors else 0
 
 
 if __name__ == "__main__":

@@ -103,7 +103,7 @@ Portals put page notices into the description. OpenDataPhilly records open with 
 
 ### Dates
 
-HDX `dataset_date` is a range: `[1970-01-01T00:00:00 TO 2019-12-31T23:59:59]`. RDLS has `temporal.start` and `temporal.end`. portolan-cli 0.8.0 has no `metadata.yaml` key for a range. `defaults.temporal` sets one datetime on items that have none. Report the range to the user. Write `defaults.temporal` only for items with no datetime.
+HDX `dataset_date` is a range: `[1970-01-01T00:00:00 TO 2019-12-31T23:59:59]`. RDLS has `temporal.start` and `temporal.end`. portolan-cli 0.9.0 has no `metadata.yaml` key for a range. `defaults.temporal` sets one datetime on items that have none. Report the range to the user. Write `defaults.temporal` only for items with no datetime.
 
 ### Other fields
 
