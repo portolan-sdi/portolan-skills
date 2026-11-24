@@ -93,6 +93,25 @@ python3 tools/upload_data.py --confirm  # upload; needs AWS credentials
 
 Its change detection compares a multipart object by size alone. Pass `--force` after you replace a file with one of the same size.
 
+### Decide how metadata reaches the bucket
+
+The default branch is the source of truth. After a change merges there, the published metadata must match it. Readers see the bucket, not the repository, so a merged fix that is not published does not reach them.
+
+The template includes `tools/publish.py` but no workflow that runs it. Choose one mechanism, and state it in the repository's `AGENTS.md`:
+
+* **Publish on merge.** A workflow runs `tools/publish.py --confirm` on each push to the default branch that changes `catalog/**`. A contributor's merged pull request then reaches readers with no maintainer step. Prefer this mode when CI can get write access to the store.
+* **Publish by hand.** A maintainer runs `tools/publish.py --confirm` after each merge. Use this mode only when CI cannot get write access. Name who publishes.
+
+In both modes:
+
+* Do not publish metadata only from a scheduled data refresh. A metadata change then stays out of the bucket until the next refresh finds new data.
+* Get credentials from the store's OpenID Connect (OIDC) exchange when it has one. The repository then stores no long-lived key.
+* Give the publish job and any refresh job that writes the bucket the same `concurrency` group. The publish job then never overlaps a refresh write.
+* Stop before an upload if the bucket holds a version that git does not. That happens when a refresh publishes and then fails to commit.
+* Run a scheduled check that compares the published metadata with the default branch, and fail it when they differ.
+
+[pergamino-ide-catalog](https://github.com/nlebovits/pergamino-ide-catalog) publishes on merge to Source Cooperative. See its `.github/workflows/publish.yml` and `tools/check_sync.py`.
+
 ### CI checks links without the bytes
 
 A fresh clone in CI has the metadata and not the data, so asset hrefs do not resolve there. The template's `ci.yml` sets `CI_LIGHT=1`, and `tests/test_links.py` then exempts asset hrefs with a data suffix. Structural links stay checked. Leave `CI_LIGHT` unset locally. The full check then runs where the bytes are.
@@ -112,7 +131,7 @@ For row counts and percentages, provide a query instead of a value that can go s
 
 ## Mode B: maintain an existing catalog
 
-The loop is:
+Read the repository's `AGENTS.md` first to learn how the catalog publishes. For a catalog that publishes on merge, the loop ends when the pull request merges, and the workflow uploads. For a catalog that publishes by hand, the loop is:
 
 ```bash
 python3 tests/run_all.py
