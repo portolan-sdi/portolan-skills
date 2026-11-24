@@ -45,7 +45,7 @@ COLLECTION_DIR = ROOT / "catalog" / COLLECTION_ID
 OUTPUT = COLLECTION_DIR / "collection.json"
 
 PUBLIC_BASE = "https://data.source.coop/<account>/<repository>"
-# An absolute asset href MUST be https (PORTO-CORE-023) and SHOULD also expose
+# An absolute asset href SHOULD be https (PORTO-CORE-023) and SHOULD also expose
 # an s3 alternate through the alternate-assets extension (PORTO-CORE-024).
 S3_BASE = "s3://<region>.opendata.source.coop/<account>/<repository>"
 PMTILES_NAME = f"{COLLECTION_ID}.pmtiles"
@@ -74,12 +74,12 @@ TEMPORAL_INTERVAL = [["<YYYY-MM-DDT00:00:00Z>", None]]
 
 # The profile schema version the current spec release defines. Every object in
 # the tree, root included, must declare the same one.
-PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.2.0/schema.json"
+PORTOLAN_SCHEMA = "https://schemas.portolan-sdi.org/portolan/v0.3.0/schema.json"
 
 # The glob is s3://, not https://, and that is deliberate. Expanding a glob
 # needs a listing, which plain HTTP does not provide: an https glob is sent
-# literally and 404s. PORTO-FMT-020 exempts `partition:glob` from the
-# https-only rule for exactly this reason. The bucket reads anonymously, so
+# literally and 404s. PORTO-FMT-064 requires an absolute, listable URL for the
+# partition glob. The bucket reads anonymously, so
 # this costs a consumer nothing but the path-style setting in AGENTS.md.
 PARTITION_GLOB = (
     "s3://<region>.opendata.source.coop/<account>/<repository>"

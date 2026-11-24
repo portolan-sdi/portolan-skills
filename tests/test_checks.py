@@ -150,3 +150,22 @@ def test_isolated_cli_failure_blocks(drift, tmp_path, monkeypatch):
     assert findings[0].check == "cli-environment"
     assert findings[0].blocking
     assert findings[0].message == "resolution failed"
+
+
+def test_plugin_subcommand(drift):
+    import click
+
+    @click.command()
+    @click.option("--layers")
+    def arcgis(layers):
+        pass
+
+    class ExtractGroup(click.Group):
+        def list_commands(self, ctx):
+            return ["arcgis"]
+
+        def get_command(self, ctx, name):
+            return arcgis if name == "arcgis" else None
+
+    cli = click.Group(commands={"extract": ExtractGroup("extract")})
+    assert checks(drift, cli, "portolan", "extract", "--layers", "buildings", "arcgis") == []

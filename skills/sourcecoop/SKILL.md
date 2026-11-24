@@ -99,9 +99,13 @@ eval "$(source-coop creds --format env)"
 
 The credentials expire, and the shell keeps the old values. `source-coop creds` refreshes expired credentials from the cached refresh token. When an upload fails with `AccessDenied` or `403 Forbidden`, run the `eval` line again.
 
-Do not set `PORTOLAN_PROFILE`, and do not pass `--profile` to `portolan push`. portolan-cli 0.8.0 reads a named profile only from `~/.aws/credentials`. It ignores `credential_process` and `endpoint_url` in `~/.aws/config`. A profile name other than `default` also discards the credentials that the `eval` line set. The push then finds no credentials and stalls against the instance metadata service at `169.254.169.254`.
+### The AWS profile
 
-### The AWS profile for other tools
+portolan-cli 0.9.0 reads `endpoint_url` from an AWS profile. With the
+`portolan-cli[aws]` extra installed, it also runs the profile's
+`credential_process` through botocore and can refresh credentials during a
+transfer. Select the profile with `portolan push --profile source-coop`, or
+set `AWS_PROFILE=source-coop`. The environment export above also works.
 
 The aws CLI, boto3, rclone, and DuckDB run `credential_process` from `~/.aws/config`. The [Source Cooperative docs](https://docs.source.coop/upload-with-the-cli) give this profile:
 
@@ -111,7 +115,7 @@ credential_process = source-coop creds
 endpoint_url = https://data.source.coop
 ```
 
-`portolan push` does not use this profile. Use it to list the prefix and to confirm what the push wrote:
+Use the same profile to list the prefix and confirm what the push wrote:
 
 ```bash
 aws s3 ls s3://{org}/{product}/ --profile source-coop --recursive
@@ -211,11 +215,12 @@ portolan push --verbose
 
 `--workers` sets the number of parallel collections and has no cap. `--concurrency` sets the concurrent uploads within a collection and defaults to 8. On a home network, leave `--adaptive` on and lower `--chunk-concurrency` before you raise anything.
 
-After the push, probe the published host. The host must honor `Range` requests with an accurate HEAD `Content-Length` (PORTO-CORE-043) and send CORS headers on every file (PORTO-CORE-045). `rashid check` takes the local catalog directory, never a URL. The base URL makes the relative hrefs probeable:
+After the push, check the published catalog with standalone rashid 0.4.0.
+The host must honor range requests for files read in parts (PORTO-CORE-043)
+and provide CORS headers for metadata and assets (PORTO-CORE-045).
 
 ```bash
-rashid check --live \
-  --live-base-url https://data.source.coop/{org}/{product}/ .
+rashid check https://data.source.coop/{org}/{product}/catalog.json
 ```
 
 Then open the catalog in the browser and confirm the default style renders visible data: `https://browser.portolan-sdi.org/#/external/data.source.coop/{org}/{product}/catalog.json`.
@@ -248,7 +253,7 @@ The credentials expired, or they do not cover the prefix.
 
 The push found no credentials and queried the instance metadata service. The error names `http://169.254.169.254/latest/api/token`.
 
-1. Remove `PORTOLAN_PROFILE` from `.env` and from the shell, and remove `--profile` from the command.
+1. If you use an AWS profile, check that portolan-cli has the `aws` extra and that the selected profile can return credentials.
 2. Run `eval "$(source-coop creds --format env)"` in the shell you push from.
 
 ### Bucket not found

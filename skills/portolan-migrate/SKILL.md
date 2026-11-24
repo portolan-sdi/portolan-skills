@@ -176,7 +176,7 @@ Where rashid and the spec disagree, the spec decides. File the disagreement agai
 
 ### Pin the version
 
-The template's `tests/test_conformance.py` requires rashid `>=0.1.8,<0.2.0` on `PATH`. For rashid 0.3.0, change that range to `>=0.3.0,<0.4.0` and update both version tuples. Use the same version in the repository virtualenv and CI.
+The template's `tests/test_conformance.py` requires rashid `>=0.1.8,<0.2.0` on `PATH`. For rashid 0.4.0, change that range to `>=0.4.0,<0.5.0` and update both version tuples. Use the same version in the repository virtualenv and CI.
 
 Then check which one you are invoking. `portolan check` imports rashid from the CLI's own environment, while a bare `rashid check` uses whatever is on `PATH`. They are routinely different versions on the same machine. Re-running with a newer validator and getting an identical error count is a finding. It can mean the rules you care about never ran.
 
@@ -184,19 +184,19 @@ Then check which one you are invoking. `portolan check` imports rashid from the 
 
 Every catalog and collection MUST declare the versioned Portolan schema URI in `stac_extensions` (PORTO-CORE-006). rashid reads the profile version from the **root** catalog and flags every object whose URI differs from it as `PTL-CNF-002`. Measured on a 197-object catalog by flipping only the root URI, that is 196 findings, one per object. Set the version once, at the root, and make the per-collection pass match it.
 
-Take the version from the spec release you are targeting. The CLI stamps the highest schema version the installed rashid bundles, so what it writes tracks a dependency rather than your target. With portolan-cli 0.8.0 and rashid 0.1.8 that is v0.2.0, which matches spec v0.2.0. Pin the pair and check the stamped URI once. The reference generators keep the URI in a module constant so the choice is explicit.
+Take the version from the spec release you are targeting. The CLI stamps the highest schema version the installed rashid bundles, so what it writes tracks a dependency rather than your target. portolan-cli 0.9.0 stamps v0.2.0 with its supported rashid dependency. Set the URI explicitly to v0.3.0 when targeting spec v0.3.0, and check it with standalone rashid 0.4.0. The reference generators keep the URI in a module constant so the choice is explicit.
 
-### Remote globs hide partitions from rashid
+### Check staged partitions before publishing
 
-rashid 0.1.8 runs `PTL-DAT-006`, `PTL-DAT-007`, `PTL-DAT-008`, `PTL-DAT-012`, and `PTL-DAT-014` over every file a local relative `partition:glob` matches, and reports once per collection at `/partition:glob`. A remote or absolute glob (`s3://`, `https://`, `/data`) cannot be listed from the local tree, so rashid does not read those partitions. The run reports no error.
-
-A published partitioned collection uses exactly that layout. Its data assets use absolute `https` hrefs and its glob uses a bucket-native scheme, which PORTO-FMT-020 permits because glob expansion needs a listing. So a clean local run before upload proves nothing about the partitions.
+rashid 0.4.0 expands a local relative `partition:glob` and checks every matched file. A `file://` glob leaves the partitions unread. The published catalog keeps an absolute, listable bucket glob such as `s3://`, `gs://`, or `az://` (PORTO-FMT-064, PORTO-FMT-075).
 
 Build a throwaway tree that mirrors the published layout, with hrefs rewritten to relative paths and the glob rewritten to a local relative pattern. Symlink the partitions rather than copy them, then run the data pass against that tree. Checksums still match, because the symlinks point at the same files the generator measured. See `reference/tools/validate_with_data.py`.
 
+Expect `PTL-PRT-002` at `/partition:glob` on the rewritten collection. The relative glob is deliberate and stays in the throwaway tree. Judge the data pass on the `PTL-DAT-*` findings and fail the run on any other error. Keep `PTL-PRT-002` enabled in the published catalog and out of `ACCEPTED`.
+
 ### Run a Negative Control
 
-Build a deliberately broken copy of the catalog, run the validator, and confirm it fails. Do this before you trust any clean run, not after. Plant a partition with a row group over the 150,000-row cap (PORTO-FMT-009) and confirm `PTL-DAT-008` fires at `/partition:glob`. It is the cheapest step in this skill.
+Build a deliberately broken copy of the catalog, run the validator, and confirm it fails. Do this before you trust any clean run, not after. Plant a partition with a row group over the 150,000-row cap (PORTO-FMT-009) and confirm the throwaway-tree check fails with `PTL-DAT-008` at `/partition:glob`. It is the cheapest step in this skill.
 
 ### Never Widen the Allow-List
 
@@ -295,7 +295,7 @@ Guard the prune list. Any remote key that matches one of the new prefixes but is
 
 ### Traps found only after publishing
 
-**`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. PORTO-FMT-020 exempts the glob from the https-only rule for exactly this reason. Enabling asterisks in HTTP paths does not rescue it. The glob never expands over plain HTTP. The single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
+**`partition:glob` must use a bucket-native scheme.** Expanding a glob needs a directory listing and plain HTTP does not provide one, so the pattern is sent literally and returns 404. PORTO-FMT-064 requires an absolute, listable URL. Asterisks in an HTTP path do not provide a listing. The single-file case is unaffected, so state plainly in the documentation which access path needs credentials and which does not.
 
 **A bucket name containing dots needs path-style addressing.** Virtual-host addressing fails TLS verification. The documented setup has to say so and state the endpoint. Otherwise the reader's first query fails.
 
@@ -309,7 +309,13 @@ Treat this as a gate. Use only the setup the documentation gives the reader, fro
 
 If a documented query fails, fix the query or delete it. Do not publish it broken.
 
-Then re-run the validator against the live catalog, which probes the host for range support and CORS headers. `portolan check --live` takes the published base URL as `--url`, overriding `publish.public_url`. Running rashid directly, the same argument is spelled `--live-base-url`.
+Then run rashid 0.4.0 against the published catalog. It lists the bucket glob anonymously and samples up to 64 partition footers, with up to four partitions for row ordering. It also probes the host for range support and CORS headers.
+
+```bash
+rashid check "$CATALOG_URL" --data-scope all
+```
+
+`portolan check --live` takes the published base URL as `--url`, overriding `publish.public_url`. Running rashid directly, the same argument is spelled `--live-base-url`.
 
 ## Mechanics
 
@@ -350,7 +356,7 @@ The generator must leave two fields alone. It keeps the root's absolute `self` l
 |---|---|
 | `reencode.py` | Row groups over the `PTL-DAT-008` cap, streamed so peak memory is one batch |
 | `build_collection.py` | Measured extents, counts, and checksums, with a staleness check |
-| `validate_with_data.py` | A remote `partition:glob` the local data pass is unable to list |
+| `validate_with_data.py` | Remote partition sampling when every staged partition needs a check |
 | `sld_graduated.py` | The SLD converter skipping class-break rules |
 | `fix_styles.py` | Generated styles that omit the source URL or the zoom range |
 | `apply_metadata.py` | Metadata `add` cannot derive from the tree |

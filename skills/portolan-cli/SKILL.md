@@ -74,7 +74,7 @@ Facts that trip agents:
 - `add` takes `--pmtiles`, `--force-pmtiles`, `--thumbnails`, `--force-thumbnails`, `--stac-geoparquet`, `--item-id`, `--datetime`, `--reconvert`, and `--force`. `--force-pmtiles` implies `--pmtiles`.
 - `push --workers` is the parallelism across collections. `--concurrency` is the upload parallelism within one, default 8. Neither has a cap.
 - The root group takes `--format json`. Most subcommands take `--json`. `partition` accepts no JSON flag.
-- `check` calls the pinned `rashid`. Where the two disagree, the spec decides, and the disagreement is a bug to report.
+- `check` uses its own rashid dependency (`>=0.2.0,<0.4.0` in portolan-cli 0.9.0). Use standalone rashid 0.4.0 to check against Portolan v0.3.0. Where the two disagree, the spec decides, and the disagreement is a bug to report.
 
 ## Workflows
 

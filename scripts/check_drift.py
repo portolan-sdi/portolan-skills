@@ -343,9 +343,12 @@ def resolve_command(root: click.Command, positionals: list[str]) -> tuple[click.
     cmd = root
     path: list[str] = []
     rest = list(positionals)
-    while isinstance(cmd, click.Group) and rest and rest[0] in cmd.commands:
-        path.append(rest[0])
-        cmd = cmd.commands[rest.pop(0)]
+    while isinstance(cmd, click.Group) and rest:
+        child = cmd.get_command(click.Context(cmd), rest[0])
+        if child is None:
+            break
+        path.append(rest.pop(0))
+        cmd = child
     return cmd, path, rest
 
 
@@ -369,8 +372,11 @@ def required_flags(cmd: click.Command) -> list[set[str]]:
 def collect_value_options(root: click.Command) -> set[str]:
     out = value_options(root)
     if isinstance(root, click.Group):
-        for sub in root.commands.values():
-            out |= collect_value_options(sub)
+        ctx = click.Context(root)
+        for name in root.list_commands(ctx):
+            sub = root.get_command(ctx, name)
+            if sub is not None:
+                out |= collect_value_options(sub)
     return out
 
 
@@ -394,7 +400,7 @@ def check_click_command(command: Command, root: click.Command, prefix: str) -> l
     node = root
     allowed |= accepted_flags(node)
     for name in path:
-        node = node.commands[name]
+        node = node.get_command(click.Context(node), name)
         allowed |= accepted_flags(node)
     for flag in flags:
         if flag not in allowed:
